@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrossFit AMRAP 20 Min — OBSDNFIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#09090e; --border:#1c1c28; --work:#dc2626; --accent:#f59e0b; --text:#e2e8f0; --muted:#475569; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:100; opacity:0.4; }
+  .glow { position:fixed; border-radius:50%; filter:blur(140px); pointer-events:none; transition:background 1.5s ease; }
+  .glow-1 { width:700px; height:700px; top:-250px; left:-250px; background:rgba(220,38,38,0.06); }
+  .glow-2 { width:500px; height:500px; bottom:-150px; right:-150px; background:rgba(245,158,11,0.04); }
+
+  .countdown-overlay { position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; }
+  .cd-label { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:0.4em; color:var(--muted); }
+  .cd-number { font-family:'Bebas Neue',sans-serif; font-size:12rem; line-height:1; color:var(--work); animation:cdpulse 1s ease-in-out; }
+  .cd-sub { font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:0.25em; color:var(--muted); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+
+  .motivator { position:fixed; top:8%; left:50%; transform:translateX(-50%); font-family:'Bebas Neue',sans-serif; font-size:2.5rem; letter-spacing:0.35em; pointer-events:none; z-index:150; opacity:0; transition:opacity 0.3s ease; white-space:nowrap; }
+
+  .container { position:relative; z-index:10; width:100%; max-width:560px; padding:1.8rem 1.5rem; display:flex; flex-direction:column; align-items:center; gap:1.4rem; }
+
+  .header { width:100%; display:flex; justify-content:space-between; align-items:center; }
+  .title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:0.25em; color:var(--muted); }
+  .total-time { font-size:0.75rem; color:var(--muted); letter-spacing:0.1em; }
+
+  .overall-progress { width:100%; height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .overall-fill { height:100%; background:linear-gradient(90deg,var(--work),var(--accent)); width:0%; transition:width 1s linear; }
+
+  .wod-badge { font-family:'Bebas Neue',sans-serif; font-size:4rem; letter-spacing:0.3em; color:var(--work); line-height:1; }
+
+  .timer-wrap { position:relative; width:260px; height:260px; }
+  .timer-svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .timer-track { fill:none; stroke:var(--border); stroke-width:3; }
+  .timer-progress { fill:none; stroke-width:3; stroke-linecap:round; transition:stroke-dashoffset 1s linear, stroke 0.6s ease; }
+  .timer-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; }
+  .timer-count { font-family:'Bebas Neue',sans-serif; font-size:5rem; line-height:1; letter-spacing:0.05em; color:var(--work); }
+  .timer-unit { font-size:0.6rem; letter-spacing:0.2em; color:var(--muted); }
+
+  .wod-name { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:0.2em; color:var(--accent); }
+
+  .movements { width:100%; display:flex; flex-direction:column; gap:4px; }
+  .movement-row { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border:1px solid var(--border); }
+  .mvt-name { font-size:0.65rem; letter-spacing:0.15em; color:var(--text); }
+  .mvt-reps { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:0.1em; color:var(--work); }
+
+  .amrap-label { font-size:0.6rem; letter-spacing:0.25em; color:var(--muted); text-align:center; }
+
+  .controls { display:flex; gap:1rem; align-items:center; }
+  .btn { background:none; border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.15em; padding:0.6rem 1.4rem; cursor:pointer; transition:all 0.2s ease; text-transform:uppercase; }
+  .btn:hover { border-color:var(--work); color:var(--work); }
+  .btn-main { background:var(--work); border-color:var(--work); color:#fff; font-size:0.75rem; padding:0.75rem 2.5rem; }
+  .btn-main:hover { background:#b91c1c; }
+
+  .lofi-tag { font-size:0.6rem; letter-spacing:0.2em; color:var(--muted); display:flex; align-items:center; gap:0.5rem; opacity:0.5; }
+  .lofi-dot { width:5px; height:5px; border-radius:50%; background:var(--accent); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:1;transform:scale(1.3);} }
+
+  .finish-screen { display:none; flex-direction:column; align-items:center; gap:1.5rem; text-align:center; }
+  .finish-title { font-family:'Bebas Neue',sans-serif; font-size:5rem; letter-spacing:0.15em; color:var(--work); line-height:1; }
+  .finish-sub { font-size:0.7rem; letter-spacing:0.2em; color:var(--muted); }
+
+  .flash { animation:flash 0.3s ease; }
+  @keyframes flash { 0%{opacity:1;} 50%{opacity:0.15;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+<div class="glow glow-1" id="glow1"></div>
+<div class="glow glow-2"></div>
+
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">AMRAP</div>
+  <div class="cd-number" id="cdNumber">3</div>
+  <div class="cd-sub">20 MIN — CINDY</div>
+</div>
+
+<div class="motivator" id="motivator"></div>
+
+<div class="container" id="mainScreen">
+  <div class="header">
+    <div class="title">OBSDNFIT × CROSSFIT</div>
+    <div class="total-time" id="totalDisplay">20:00</div>
+  </div>
+  <div class="overall-progress"><div class="overall-fill" id="overallFill"></div></div>
+
+  <div class="wod-badge">AMRAP</div>
+
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 260 260">
+      <circle class="timer-track" cx="130" cy="130" r="120"/>
+      <circle class="timer-progress" id="timerCircle" cx="130" cy="130" r="120"
+        stroke="#dc2626" stroke-dasharray="753.98" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-inner">
+      <div class="timer-count" id="timerCount">20:00</div>
+      <div class="timer-unit">TIME LEFT</div>
+    </div>
+  </div>
+
+  <div class="wod-name">CINDY</div>
+
+  <div class="movements">
+    <div class="movement-row">
+      <span class="mvt-name">PULL-UPS</span>
+      <span class="mvt-reps">5 REPS</span>
+    </div>
+    <div class="movement-row">
+      <span class="mvt-name">PUSH-UPS</span>
+      <span class="mvt-reps">10 REPS</span>
+    </div>
+    <div class="movement-row">
+      <span class="mvt-name">AIR SQUATS</span>
+      <span class="mvt-reps">15 REPS</span>
+    </div>
+  </div>
+
+  <div class="amrap-label">AS MANY ROUNDS AS POSSIBLE IN 20 MIN</div>
+
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn btn-main" id="startBtn" onclick="startWithCountdown()">START</button>
+  </div>
+
+  <div class="lofi-tag"><div class="lofi-dot"></div>LO-FI MODE — ADD YOUR MUSIC</div>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title">TIME!</div>
+  <div class="finish-sub">20 MIN AMRAP — CINDY</div>
+  <div class="finish-sub" style="margin-top:0.5rem;color:var(--work)">WELL DONE.</div>
+  <button class="btn btn-main" onclick="resetTimer();document.getElementById('finishScreen').style.display='none';document.getElementById('mainScreen').style.display='flex';" style="margin-top:1rem">RESTART</button>
+</div>
+
+<script>
+const DURATION = 20 * 60;
+let timeLeft = DURATION;
+let running = false;
+let interval = null;
+let elapsed = 0;
+const circ = 753.98;
+
+function fmt(s) { return Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0'); }
+
+function updateUI() {
+  const pct = 1 - timeLeft/DURATION;
+  document.getElementById('timerCircle').style.strokeDashoffset = circ*(1-timeLeft/DURATION);
+  document.getElementById('timerCount').textContent = fmt(timeLeft);
+  document.getElementById('overallFill').style.width = (pct*100)+'%';
+  document.getElementById('totalDisplay').textContent = fmt(timeLeft);
+  // Color shifts last 60s
+  if (timeLeft <= 60) {
+    document.getElementById('timerCircle').style.stroke = '#f59e0b';
+    document.getElementById('timerCount').style.color = '#f59e0b';
+    document.getElementById('glow1').style.background = 'rgba(245,158,11,0.1)';
+  }
+}
+
+function showMotivator(t,c) { const e=document.getElementById('motivator'); e.textContent=t; e.style.color=c; e.style.opacity='1'; setTimeout(()=>{e.style.opacity='0';},2000); }
+
+function tick() {
+  if (timeLeft > 0) {
+    timeLeft--; elapsed++;
+    if (timeLeft===60) showMotivator('1 MINUTE LEFT!','#f59e0b');
+    if (timeLeft===30) showMotivator('30 SECONDS!','#f59e0b');
+    if (timeLeft===10) showMotivator('10 SECONDS!','#dc2626');
+    updateUI();
+  } else {
+    clearInterval(interval); running=false;
+    document.body.classList.add('flash');
+    setTimeout(()=>document.body.classList.remove('flash'),400);
+    showMotivator('TIME!','#dc2626');
+    soundFinish();setTimeout(showFinish,1500);
+  }
+}
+
+function startWithCountdown() {
+  const btn=document.getElementById('startBtn');
+  if (running) { clearInterval(interval); running=false; btn.textContent='RESUME'; return; }
+  if (elapsed===0) {
+    const ov=document.getElementById('countdownOverlay'); const cdN=document.getElementById('cdNumber');
+    ov.style.display='flex'; let count=3; cdN.textContent=count;
+    const cdI=setInterval(()=>{ count--; if(count===0){clearInterval(cdI);ov.style.display='none';interval=setInterval(tick,1000);running=true;btn.textContent='PAUSE';showMotivator('GO!','#dc2626');}else{cdN.textContent=count;cdN.style.animation='none';cdN.offsetHeight;cdN.style.animation='cdpulse 1s ease-in-out';} },1000);
+  } else { interval=setInterval(tick,1000); running=true; btn.textContent='PAUSE'; }
+}
+
+function resetTimer() { clearInterval(interval); running=false; timeLeft=DURATION; elapsed=0; document.getElementById('startBtn').textContent='START'; document.getElementById('timerCircle').style.stroke='#dc2626'; document.getElementById('timerCount').style.color='var(--work)'; document.getElementById('glow1').style.background='rgba(220,38,38,0.06)'; updateUI(); }
+function showFinish() { document.getElementById('mainScreen').style.display='none'; document.getElementById('finishScreen').style.display='flex'; }
+updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full Body Timer — 45 Min Lo-Fi</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --work: #22d3ee;
+    --rest: #f97316;
+    --text: #e2e8f0;
+    --muted: #475569;
+    --accent: #22d3ee;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.4;
+  }
+
+  .glow {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(130px);
+    pointer-events: none;
+    transition: background 1.5s ease;
+  }
+  .glow-1 { width: 600px; height: 600px; top: -200px; left: -200px; background: rgba(34,211,238,0.05); }
+  .glow-2 { width: 400px; height: 400px; bottom: -100px; right: -100px; background: rgba(249,115,22,0.04); }
+
+  .container {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 580px;
+    padding: 1.8rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.4rem;
+  }
+
+  .header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+  }
+
+  .total-time {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .overall-progress {
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .overall-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--work), var(--rest));
+    width: 0%;
+    transition: width 1s linear;
+  }
+
+  .phase-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 4rem;
+    letter-spacing: 0.15em;
+    line-height: 1;
+    transition: color 0.6s ease;
+    text-align: center;
+  }
+  .phase-label.work { color: var(--work); }
+  .phase-label.rest { color: var(--rest); }
+
+  .timer-wrap {
+    position: relative;
+    width: 240px;
+    height: 240px;
+  }
+
+  .timer-svg {
+    position: absolute;
+    inset: 0;
+    transform: rotate(-90deg);
+  }
+
+  .timer-track { fill: none; stroke: var(--border); stroke-width: 3; }
+
+  .timer-progress {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.6s ease;
+  }
+
+  .timer-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+  }
+
+  .timer-count {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 5.5rem;
+    line-height: 1;
+    letter-spacing: 0.05em;
+    transition: color 0.6s ease;
+  }
+
+  .timer-unit { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  /* Muscle group badge */
+  .muscle-badge {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--work);
+    border: 1px solid rgba(34,211,238,0.2);
+    padding: 3px 10px;
+    text-transform: uppercase;
+    transition: all 0.4s ease;
+  }
+
+  .exercise-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.2em;
+    text-align: center;
+    min-height: 2rem;
+    transition: color 0.4s ease;
+  }
+
+  .next-exercise {
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-align: center;
+    opacity: 0.6;
+  }
+
+  .round-info {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .info-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .info-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.1em;
+    line-height: 1;
+  }
+
+  .info-label { font-size: 0.58rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+
+  .sep { width: 1px; height: 36px; background: var(--border); }
+
+  /* Body map indicator */
+  .body-map {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .body-part {
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    text-transform: uppercase;
+    transition: all 0.4s ease;
+  }
+
+  .body-part.active {
+    color: var(--work);
+    border-color: rgba(34,211,238,0.4);
+    background: rgba(34,211,238,0.05);
+  }
+
+  /* Exercise grid */
+  .ex-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+  }
+
+  .ex-cell {
+    height: 6px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.4s ease;
+  }
+  .ex-cell.done { background: var(--work); opacity: 0.4; }
+  .ex-cell.active { background: var(--work); box-shadow: 0 0 6px var(--work); }
+  .ex-cell.rest-done { background: var(--rest); opacity: 0.3; }
+
+  /* Set indicators */
+  .sets-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .set-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .set-bar {
+    width: 40px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: all 0.4s ease;
+  }
+  .set-bar.done { background: var(--work); opacity: 0.5; }
+  .set-bar.active { background: var(--work); box-shadow: 0 0 4px var(--work); }
+
+  .set-num { font-size: 0.55rem; letter-spacing: 0.15em; color: var(--muted); }
+
+  .controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    padding: 0.6rem 1.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-main {
+    background: var(--work);
+    border-color: var(--work);
+    color: #000;
+    font-size: 0.75rem;
+    padding: 0.75rem 2.5rem;
+  }
+
+  .btn-main:hover { background: #18b8cc; border-color: #18b8cc; color: #000; }
+  .btn-main.resting { background: var(--rest); border-color: var(--rest); }
+  .btn-main.resting:hover { background: #ea6c0a; border-color: #ea6c0a; }
+
+  .lofi-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.5;
+  }
+
+  .lofi-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--rest);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
+  }
+
+  .finish-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    text-align: center;
+  }
+
+  .finish-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 5rem;
+    letter-spacing: 0.15em;
+    color: var(--work);
+    line-height: 1;
+  }
+
+  .finish-sub { font-size: 0.7rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  .flash { animation: flash 0.3s ease; }
+
+  @keyframes flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1" id="glow1"></div>
+<div class="glow glow-2"></div>
+
+<div class="container" id="mainScreen">
+  <div class="header">
+    <div class="title">OBSDNFIT × FULL BODY</div>
+    <div class="total-time" id="totalDisplay">45:00</div>
+  </div>
+
+  <div class="overall-progress">
+    <div class="overall-fill" id="overallFill"></div>
+  </div>
+
+  <div class="phase-label work" id="phaseLabel">WORK</div>
+
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 240 240">
+      <circle class="timer-track" cx="120" cy="120" r="110"/>
+      <circle class="timer-progress" id="timerCircle" cx="120" cy="120" r="110"
+        stroke="#22d3ee"
+        stroke-dasharray="691.15"
+        stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-inner">
+      <div class="timer-count" id="timerCount" style="color: var(--work)">40</div>
+      <div class="timer-unit">seconds</div>
+    </div>
+  </div>
+
+  <div class="muscle-badge" id="muscleBadge">LOWER BODY</div>
+  <div class="exercise-name" id="exerciseName">SQUATS</div>
+  <div class="next-exercise" id="nextExercise">NEXT → REST 20s</div>
+
+  <div class="round-info">
+    <div class="info-block">
+      <div class="info-val" id="exerciseDisplay">1</div>
+      <div class="info-label">Exercise</div>
+    </div>
+    <div class="sep"></div>
+    <div class="info-block">
+      <div class="info-val">12</div>
+      <div class="info-label">Per Set</div>
+    </div>
+    <div class="sep"></div>
+    <div class="info-block">
+      <div class="info-val" id="setDisplay">1</div>
+      <div class="info-label">Set</div>
+    </div>
+    <div class="sep"></div>
+    <div class="info-block">
+      <div class="info-val">3</div>
+      <div class="info-label">Total</div>
+    </div>
+  </div>
+
+  <!-- Body parts -->
+  <div class="body-map" id="bodyMap">
+    <div class="body-part" id="bp-lower">LOWER</div>
+    <div class="body-part" id="bp-upper">UPPER</div>
+    <div class="body-part" id="bp-core">CORE</div>
+    <div class="body-part" id="bp-cardio">CARDIO</div>
+    <div class="body-part" id="bp-full">FULL</div>
+  </div>
+
+  <!-- Sets bars -->
+  <div class="sets-row" id="setsRow"></div>
+
+  <!-- Exercise grid -->
+  <div class="ex-grid" id="exGrid"></div>
+
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn btn-main" id="startBtn" onclick="toggleTimer()">START</button>
+    <button class="btn" onclick="skipPhase()">SKIP</button>
+  </div>
+
+  <div class="lofi-tag">
+    <div class="lofi-dot"></div>
+    LO-FI MODE — ADD YOUR MUSIC
+  </div>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title">CRUSHED.</div>
+  <div class="finish-sub">45 MINUTES — 3 SETS — 12 EXERCISES</div>
+  <div class="finish-sub" style="margin-top:0.5rem; color: var(--work)">FULL BODY DONE</div>
+  <button class="btn btn-main" onclick="resetTimer(); document.getElementById('finishScreen').style.display='none'; document.getElementById('mainScreen').style.display='flex';" style="margin-top:1rem">RESTART</button>
+</div>
+
+<script>
+const EXERCISES = [
+  { name: "SQUATS",          muscle: "LOWER BODY", group: "lower" },
+  { name: "PUSH-UPS",        muscle: "UPPER BODY", group: "upper" },
+  { name: "LUNGES",          muscle: "LOWER BODY", group: "lower" },
+  { name: "PLANK",           muscle: "CORE",       group: "core"  },
+  { name: "JUMPING JACKS",   muscle: "CARDIO",     group: "cardio"},
+  { name: "TRICEP DIPS",     muscle: "UPPER BODY", group: "upper" },
+  { name: "GLUTE BRIDGES",   muscle: "LOWER BODY", group: "lower" },
+  { name: "MOUNTAIN CLIMB",  muscle: "FULL BODY",  group: "full"  },
+  { name: "SHOULDER PRESS",  muscle: "UPPER BODY", group: "upper" },
+  { name: "JUMP SQUATS",     muscle: "LOWER BODY", group: "lower" },
+  { name: "BICYCLE CRUNCH",  muscle: "CORE",       group: "core"  },
+  { name: "BURPEES",         muscle: "FULL BODY",  group: "full"  },
+];
+
+const WORK_TIME = 40;
+const REST_TIME = 20;
+const EXERCISES_PER_SET = 12;
+const TOTAL_SETS = 3;
+const TOTAL_ROUNDS = EXERCISES_PER_SET * TOTAL_SETS; // 36
+// 36 × 60s = 2160s = 36min + rest between sets ≈ 45min
+
+let currentRound = 0;
+let isWork = true;
+let timeLeft = WORK_TIME;
+let running = false;
+let interval = null;
+let totalSeconds = (WORK_TIME + REST_TIME) * TOTAL_ROUNDS;
+let elapsedSeconds = 0;
+
+const circumference = 2 * Math.PI * 110; // 691.15
+
+function buildUI() {
+  const sr = document.getElementById('setsRow');
+  sr.innerHTML = '';
+  for (let i = 0; i < TOTAL_SETS; i++) {
+    const block = document.createElement('div');
+    block.className = 'set-block';
+    block.innerHTML = `<div class="set-bar" id="setbar-${i}"></div><div class="set-num">SET ${i+1}</div>`;
+    sr.appendChild(block);
+  }
+
+  const eg = document.getElementById('exGrid');
+  eg.innerHTML = '';
+  for (let i = 0; i < EXERCISES_PER_SET; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'ex-cell';
+    cell.id = `excell-${i}`;
+    eg.appendChild(cell);
+  }
+}
+
+function updateUI() {
+  const currentSet = Math.floor(currentRound / EXERCISES_PER_SET);
+  const currentEx = currentRound % EXERCISES_PER_SET;
+  const ex = EXERCISES[currentEx];
+
+  const duration = isWork ? WORK_TIME : REST_TIME;
+  const progress = timeLeft / duration;
+  const offset = circumference * (1 - progress);
+
+  document.getElementById('timerCircle').style.strokeDashoffset = offset;
+  document.getElementById('timerCount').textContent = timeLeft;
+
+  if (isWork) {
+    document.getElementById('phaseLabel').textContent = 'WORK';
+    document.getElementById('phaseLabel').className = 'phase-label work';
+    document.getElementById('timerCount').style.color = 'var(--work)';
+    document.getElementById('timerCircle').style.stroke = '#22d3ee';
+    document.getElementById('exerciseName').style.color = 'var(--text)';
+    document.getElementById('exerciseName').textContent = ex.name;
+    document.getElementById('muscleBadge').textContent = ex.muscle;
+    document.getElementById('nextExercise').textContent = `NEXT → REST 20s`;
+    document.getElementById('startBtn').className = 'btn btn-main';
+    document.getElementById('glow1').style.background = 'rgba(34,211,238,0.06)';
+    updateBodyMap(ex.group);
+  } else {
+    const nextEx = EXERCISES[(currentEx + 1) % EXERCISES_PER_SET];
+    document.getElementById('phaseLabel').textContent = 'REST';
+    document.getElementById('phaseLabel').className = 'phase-label rest';
+    document.getElementById('timerCount').style.color = 'var(--rest)';
+    document.getElementById('timerCircle').style.stroke = '#f97316';
+    document.getElementById('exerciseName').style.color = 'var(--muted)';
+    document.getElementById('exerciseName').textContent = 'RECOVER';
+    document.getElementById('muscleBadge').textContent = `NEXT: ${nextEx.name}`;
+    document.getElementById('nextExercise').textContent = `NEXT → ${nextEx.name}`;
+    document.getElementById('startBtn').className = 'btn btn-main resting';
+    document.getElementById('glow1').style.background = 'rgba(249,115,22,0.05)';
+    updateBodyMap('');
+  }
+
+  document.getElementById('exerciseDisplay').textContent = currentEx + 1;
+  document.getElementById('setDisplay').textContent = currentSet + 1;
+
+  // Progress
+  const pct = (elapsedSeconds / totalSeconds) * 100;
+  document.getElementById('overallFill').style.width = pct + '%';
+
+  const totalLeft = totalSeconds - elapsedSeconds;
+  const mins = Math.floor(totalLeft / 60).toString().padStart(2, '0');
+  const secs = (totalLeft % 60).toString().padStart(2, '0');
+  document.getElementById('totalDisplay').textContent = `${mins}:${secs}`;
+
+  // Set bars
+  for (let i = 0; i < TOTAL_SETS; i++) {
+    const b = document.getElementById(`setbar-${i}`);
+    if (i < currentSet) b.className = 'set-bar done';
+    else if (i === currentSet) b.className = 'set-bar active';
+    else b.className = 'set-bar';
+  }
+
+  // Exercise cells
+  for (let i = 0; i < EXERCISES_PER_SET; i++) {
+    const c = document.getElementById(`excell-${i}`);
+    if (i < currentEx) c.className = 'ex-cell done';
+    else if (i === currentEx) c.className = isWork ? 'ex-cell active' : 'ex-cell rest-done';
+    else c.className = 'ex-cell';
+  }
+}
+
+function updateBodyMap(group) {
+  const groups = ['lower','upper','core','cardio','full'];
+  const ids = { lower:'bp-lower', upper:'bp-upper', core:'bp-core', cardio:'bp-cardio', full:'bp-full' };
+  groups.forEach(g => {
+    const el = document.getElementById(ids[g]);
+    el.className = g === group ? 'body-part active' : 'body-part';
+  });
+}
+
+function tick() {
+  if (timeLeft > 0) {
+    timeLeft--;
+    elapsedSeconds++;
+    updateUI();
+  } else {
+    if (isWork) {
+      isWork = false;
+      timeLeft = REST_TIME;
+      flashScreen();
+    } else {
+      currentRound++;
+      if (currentRound >= TOTAL_ROUNDS) {
+        clearInterval(interval);
+        running = false;
+        showFinish();
+        return;
+      }
+      isWork = true;
+      timeLeft = WORK_TIME;
+      flashScreen();
+    }
+    updateUI();
+  }
+}
+
+function flashScreen() {
+  document.body.classList.add('flash');
+  setTimeout(() => document.body.classList.remove('flash'), 300);
+}
+
+function toggleTimer() {
+  const btn = document.getElementById('startBtn');
+  if (running) {
+    clearInterval(interval);
+    running = false;
+    btn.textContent = 'RESUME';
+  } else {
+    interval = setInterval(tick, 1000);
+    running = true;
+    btn.textContent = 'PAUSE';
+  }
+}
+
+function resetTimer() {
+  clearInterval(interval);
+  running = false;
+  currentRound = 0;
+  isWork = true;
+  timeLeft = WORK_TIME;
+  elapsedSeconds = 0;
+  document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').className = 'btn btn-main';
+  updateUI();
+}
+
+function skipPhase() {
+  if (isWork) {
+    isWork = false;
+    timeLeft = REST_TIME;
+  } else {
+    currentRound++;
+    if (currentRound >= TOTAL_ROUNDS) {
+      clearInterval(interval);
+      running = false;
+      showFinish();
+      return;
+    }
+    isWork = true;
+    timeLeft = WORK_TIME;
+  }
+  updateUI();
+}
+
+function showFinish() {
+  document.getElementById('mainScreen').style.display = 'none';
+  document.getElementById('finishScreen').style.display = 'flex';
+}
+
+buildUI();
+updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

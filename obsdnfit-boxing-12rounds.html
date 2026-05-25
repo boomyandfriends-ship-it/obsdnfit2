@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boxing Timer — 12 Rounds Lo-Fi</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090e;
+    --border: #1c1c28;
+    --work: #ef4444;
+    --rest: #38bdf8;
+    --text: #e2e8f0;
+    --muted: #475569;
+    --accent: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    overflow: hidden; position: relative;
+  }
+
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 100; opacity: 0.4;
+  }
+
+  .glow {
+    position: fixed; border-radius: 50%;
+    filter: blur(140px); pointer-events: none;
+    transition: background 1.5s ease;
+  }
+  .glow-1 { width: 700px; height: 700px; top: -250px; left: -250px; background: rgba(239,68,68,0.06); }
+  .glow-2 { width: 400px; height: 400px; bottom: -100px; right: -100px; background: rgba(56,189,248,0.04); }
+
+  /* Bell flash overlay */
+  .bell-flash {
+    position: fixed; inset: 0; z-index: 190;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.1s ease;
+  }
+
+  /* Countdown overlay */
+  .countdown-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1rem;
+  }
+  .cd-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.4em; color: var(--muted); }
+  .cd-number { font-family: 'Bebas Neue', sans-serif; font-size: 12rem; line-height: 1; color: var(--work); animation: cdpulse 1s ease-in-out; }
+  .cd-sub { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.3em; color: var(--muted); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+
+  /* Motivator */
+  .motivator {
+    position: fixed; top: 12%; left: 50%; transform: translateX(-50%);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem; letter-spacing: 0.35em;
+    pointer-events: none; z-index: 150;
+    opacity: 0; transition: opacity 0.3s ease;
+    white-space: nowrap;
+  }
+
+  .container {
+    position: relative; z-index: 10;
+    width: 100%; max-width: 560px;
+    padding: 1.8rem 1.5rem;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 1.5rem;
+  }
+
+  .header { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .title { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.25em; color: var(--muted); }
+  .total-time { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.1em; }
+
+  .overall-progress { width: 100%; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .overall-fill { height: 100%; background: linear-gradient(90deg, var(--work), var(--rest)); width: 0%; transition: width 1s linear; }
+
+  .phase-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 4.5rem; letter-spacing: 0.2em; line-height: 1;
+    transition: color 0.4s ease; text-align: center;
+  }
+  .phase-label.work { color: var(--work); }
+  .phase-label.rest { color: var(--rest); }
+
+  .timer-wrap { position: relative; width: 260px; height: 260px; }
+  .timer-svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .timer-track { fill: none; stroke: var(--border); stroke-width: 4; }
+  .timer-progress { fill: none; stroke-width: 4; stroke-linecap: butt; transition: stroke-dashoffset 1s linear, stroke 0.4s ease; }
+
+  .timer-inner {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0.2rem;
+  }
+
+  .timer-count {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 5.5rem; line-height: 1;
+    letter-spacing: 0.05em; transition: color 0.4s ease;
+  }
+  .timer-unit { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  /* Round display — big center */
+  .round-big {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .round-big-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem; letter-spacing: 0.3em; color: var(--muted);
+  }
+
+  /* Rounds dots row */
+  .rounds-row {
+    display: flex; gap: 5px; flex-wrap: wrap; justify-content: center;
+    max-width: 420px;
+  }
+
+  .round-dot {
+    width: 28px; height: 28px; border-radius: 4px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: 0.7rem;
+    color: var(--muted); transition: all 0.4s ease;
+  }
+  .round-dot.done { background: var(--work); border-color: var(--work); color: #000; opacity: 0.5; }
+  .round-dot.active { background: var(--work); border-color: var(--work); color: #000; box-shadow: 0 0 10px rgba(239,68,68,0.5); }
+  .round-dot.rest-active { background: var(--rest); border-color: var(--rest); color: #000; box-shadow: 0 0 8px rgba(56,189,248,0.4); }
+
+  .stats-row { display: flex; gap: 2.5rem; align-items: center; }
+  .stat-block { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+  .stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.1em; line-height: 1; }
+  .stat-label { font-size: 0.58rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+  .sep { width: 1px; height: 36px; background: var(--border); }
+
+  /* Config row */
+  .config-row {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;
+  }
+  .config-btn {
+    font-family: 'DM Mono', monospace; font-size: 0.6rem;
+    letter-spacing: 0.15em; color: var(--muted);
+    border: 1px solid var(--border); padding: 4px 10px;
+    cursor: pointer; background: none; transition: all 0.2s ease;
+    text-transform: uppercase;
+  }
+  .config-btn:hover { border-color: var(--work); color: var(--work); }
+  .config-btn.active { border-color: var(--work); color: var(--work); background: rgba(239,68,68,0.08); }
+
+  .controls { display: flex; gap: 1rem; align-items: center; }
+  .btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.15em;
+    padding: 0.6rem 1.4rem; cursor: pointer;
+    transition: all 0.2s ease; text-transform: uppercase;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-main { background: var(--work); border-color: var(--work); color: #fff; font-size: 0.75rem; padding: 0.75rem 2.5rem; }
+  .btn-main:hover { background: #dc2626; border-color: #dc2626; }
+  .btn-main.resting { background: var(--rest); border-color: var(--rest); color: #000; }
+  .btn-main.resting:hover { background: #29a8d8; border-color: #29a8d8; }
+
+  .lofi-tag { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted); display: flex; align-items: center; gap: 0.5rem; opacity: 0.5; }
+  .lofi-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--rest); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:1;transform:scale(1.3);} }
+
+  .finish-screen { display: none; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center; }
+  .finish-title { font-family: 'Bebas Neue', sans-serif; font-size: 5rem; letter-spacing: 0.15em; color: var(--work); line-height: 1; }
+  .finish-sub { font-size: 0.7rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  .flash-red { animation: flashRed 0.4s ease; }
+  @keyframes flashRed { 0%{opacity:1;} 40%{opacity:0.15;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1" id="glow1"></div>
+<div class="glow glow-2"></div>
+<div class="bell-flash" id="bellFlash"></div>
+
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">BOXING TIMER</div>
+  <div class="cd-number" id="cdNumber">3</div>
+  <div class="cd-sub">SECONDS TO ROUND 1</div>
+</div>
+
+<div class="motivator" id="motivator"></div>
+
+<div class="container" id="mainScreen">
+  <div class="header">
+    <div class="title">OBSDNFIT × BOXING</div>
+    <div class="total-time" id="totalDisplay">48:00</div>
+  </div>
+
+  <div class="overall-progress">
+    <div class="overall-fill" id="overallFill"></div>
+  </div>
+
+  <div class="phase-label work" id="phaseLabel">ROUND 1</div>
+
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 260 260">
+      <circle class="timer-track" cx="130" cy="130" r="120"/>
+      <circle class="timer-progress" id="timerCircle" cx="130" cy="130" r="120"
+        stroke="#ef4444" stroke-dasharray="753.98" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-inner">
+      <div class="timer-count" id="timerCount" style="color:var(--work)">3:00</div>
+      <div class="timer-unit" id="timerUnit"></div>
+    </div>
+  </div>
+
+  <!-- Config: rounds selector -->
+  <div class="config-row" id="configRow">
+    <div style="font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);">ROUNDS:</div>
+    <button class="config-btn" onclick="setRounds(6)">6</button>
+    <button class="config-btn active" id="r12" onclick="setRounds(12)">12</button>
+    <button class="config-btn" onclick="setRounds(15)">15</button>
+    <div style="font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);margin-left:8px;">ROUND TIME:</div>
+    <button class="config-btn active" id="t3" onclick="setRoundTime(3)">3 MIN</button>
+    <button class="config-btn" onclick="setRoundTime(2)">2 MIN</button>
+  </div>
+
+  <!-- Rounds dots -->
+  <div class="rounds-row" id="roundsRow"></div>
+
+  <div class="stats-row">
+    <div class="stat-block">
+      <div class="stat-val" id="roundDisplay">1</div>
+      <div class="stat-label">Round</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat-block">
+      <div class="stat-val" id="totalRoundsDisplay">12</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat-block">
+      <div class="stat-val" id="elapsedDisplay">0:00</div>
+      <div class="stat-label">Elapsed</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn btn-main" id="startBtn" onclick="startWithCountdown()">START</button>
+    <button class="btn" onclick="skipPhase()">SKIP</button>
+  </div>
+
+  <div class="lofi-tag">
+    <div class="lofi-dot"></div>
+    LO-FI MODE — ADD YOUR MUSIC
+  </div>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title" id="finishTitle">FIGHT OVER.</div>
+  <div class="finish-sub" id="finishSub">12 ROUNDS COMPLETED</div>
+  <div class="finish-sub" style="margin-top:0.5rem; color: var(--work)">WELL DONE.</div>
+  <button class="btn btn-main" onclick="resetTimer(); document.getElementById('finishScreen').style.display='none'; document.getElementById('mainScreen').style.display='flex';" style="margin-top:1rem">RESTART</button>
+</div>
+
+<script>
+let TOTAL_ROUNDS = 12;
+let WORK_TIME = 180; // 3 min
+const REST_TIME = 60;
+
+let currentRound = 0;
+let isWork = true;
+let timeLeft = WORK_TIME;
+let running = false;
+let interval = null;
+let elapsedSeconds = 0;
+let totalSeconds = (WORK_TIME + REST_TIME) * TOTAL_ROUNDS;
+
+const circumference = 753.98;
+
+function setRounds(n) {
+  if (running) return;
+  TOTAL_ROUNDS = n;
+  totalSeconds = (WORK_TIME + REST_TIME) * TOTAL_ROUNDS;
+  document.querySelectorAll('.config-btn').forEach(b => {
+    if (b.textContent === String(n)) b.classList.add('active');
+    else if (['6','12','15'].includes(b.textContent)) b.classList.remove('active');
+  });
+  resetTimer();
+}
+
+function setRoundTime(mins) {
+  if (running) return;
+  WORK_TIME = mins * 60;
+  totalSeconds = (WORK_TIME + REST_TIME) * TOTAL_ROUNDS;
+  document.querySelectorAll('.config-btn').forEach(b => {
+    if (b.textContent === `${mins} MIN`) b.classList.add('active');
+    else if (['3 MIN','2 MIN'].includes(b.textContent)) b.classList.remove('active');
+  });
+  resetTimer();
+}
+
+function buildRoundsDots() {
+  const row = document.getElementById('roundsRow');
+  row.innerHTML = '';
+  for (let i = 0; i < TOTAL_ROUNDS; i++) {
+    const d = document.createElement('div');
+    d.className = 'round-dot';
+    d.id = `rdot-${i}`;
+    d.textContent = i + 1;
+    row.appendChild(d);
+  }
+  document.getElementById('totalRoundsDisplay').textContent = TOTAL_ROUNDS;
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = (secs % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function updateUI() {
+  const duration = isWork ? WORK_TIME : REST_TIME;
+  const progress = timeLeft / duration;
+  const offset = circumference * (1 - progress);
+
+  document.getElementById('timerCircle').style.strokeDashoffset = offset;
+  document.getElementById('timerCount').textContent = formatTime(timeLeft);
+
+  if (isWork) {
+    document.getElementById('phaseLabel').textContent = `ROUND ${currentRound + 1}`;
+    document.getElementById('phaseLabel').className = 'phase-label work';
+    document.getElementById('timerCount').style.color = 'var(--work)';
+    document.getElementById('timerCircle').style.stroke = '#ef4444';
+    document.getElementById('startBtn').className = 'btn btn-main';
+    document.getElementById('glow1').style.background = 'rgba(239,68,68,0.07)';
+    // Red tint when < 10s
+    if (timeLeft <= 10) document.getElementById('glow1').style.background = 'rgba(239,68,68,0.15)';
+  } else {
+    document.getElementById('phaseLabel').textContent = currentRound + 1 < TOTAL_ROUNDS ? `CORNER` : `DONE`;
+    document.getElementById('phaseLabel').className = 'phase-label rest';
+    document.getElementById('timerCount').style.color = 'var(--rest)';
+    document.getElementById('timerCircle').style.stroke = '#38bdf8';
+    document.getElementById('startBtn').className = 'btn btn-main resting';
+    document.getElementById('glow1').style.background = 'rgba(56,189,248,0.05)';
+  }
+
+  document.getElementById('roundDisplay').textContent = currentRound + 1;
+  document.getElementById('elapsedDisplay').textContent = formatTime(elapsedSeconds);
+
+  const pct = (elapsedSeconds / totalSeconds) * 100;
+  document.getElementById('overallFill').style.width = pct + '%';
+  document.getElementById('totalDisplay').textContent = formatTime(Math.max(0, totalSeconds - elapsedSeconds));
+
+  // Round dots
+  for (let i = 0; i < TOTAL_ROUNDS; i++) {
+    const d = document.getElementById(`rdot-${i}`);
+    if (!d) continue;
+    if (i < currentRound) d.className = 'round-dot done';
+    else if (i === currentRound) d.className = isWork ? 'round-dot active' : 'round-dot rest-active';
+    else d.className = 'round-dot';
+  }
+}
+
+function ringBell_orig() {
+  // Visual bell flash
+  const flash = document.getElementById('bellFlash');
+  flash.style.background = isWork ? 'rgba(239,68,68,0.15)' : 'rgba(56,189,248,0.1)';
+  flash.style.opacity = '1';
+  setTimeout(() => { flash.style.opacity = '0'; }, 300);
+  document.body.classList.add('flash-red');
+  setTimeout(() => document.body.classList.remove('flash-red'), 400);
+}
+
+function showMotivator(text, color) {
+  const el = document.getElementById('motivator');
+  el.textContent = text;
+  el.style.color = color;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+function tick() {
+  if (timeLeft > 0) {
+    timeLeft--;
+    elapsedSeconds++;
+    // Last 3s warning glow
+    if (isWork && timeLeft <= 3 && timeLeft > 0) {
+      document.getElementById('glow1').style.background = 'rgba(239,68,68,0.2)';
+    }
+    updateUI();
+  } else {
+    soundBell();ringBell_orig();
+    if (isWork) {
+      isWork = false;
+      timeLeft = REST_TIME;
+      showMotivator('CORNER.', '#38bdf8');
+    } else {
+      currentRound++;
+      if (currentRound >= TOTAL_ROUNDS) {
+        clearInterval(interval);
+        running = false;
+        document.getElementById('finishTitle').textContent = 'FIGHT OVER.';
+        document.getElementById('finishSub').textContent = `${TOTAL_ROUNDS} ROUNDS COMPLETED`;
+        showMotivator('WELL DONE.', '#ef4444');
+        soundFinish();setTimeout(showFinish, 1500);
+        return;
+      }
+      isWork = true;
+      timeLeft = WORK_TIME;
+      showMotivator(`ROUND ${currentRound + 1}`, '#ef4444');
+    }
+    updateUI();
+  }
+}
+
+function startWithCountdown() {
+  const btn = document.getElementById('startBtn');
+  if (running) {
+    clearInterval(interval);
+    running = false;
+    btn.textContent = 'RESUME';
+    return;
+  }
+  if (elapsedSeconds === 0) {
+    document.getElementById('configRow').style.display = 'none';
+    const overlay = document.getElementById('countdownOverlay');
+    const cdNum = document.getElementById('cdNumber');
+    overlay.style.display = 'flex';
+    let count = 3;
+    cdNum.textContent = count;
+    const cdI = setInterval(() => {
+      count--;
+      if (count === 0) {
+        clearInterval(cdI);
+        overlay.style.display = 'none';
+        startTimer();
+        showMotivator('ROUND 1 — FIGHT!', '#ef4444');
+      } else {
+        cdNum.textContent = count;
+        cdNum.style.animation = 'none';
+        cdNum.offsetHeight;
+        cdNum.style.animation = 'cdpulse 1s ease-in-out';
+      }
+    }, 1000);
+  } else {
+    startTimer();
+  }
+}
+
+function startTimer() {
+  interval = setInterval(tick, 1000);
+  running = true;
+  document.getElementById('startBtn').textContent = 'PAUSE';
+}
+
+function resetTimer() {
+  clearInterval(interval);
+  running = false;
+  currentRound = 0;
+  isWork = true;
+  timeLeft = WORK_TIME;
+  elapsedSeconds = 0;
+  totalSeconds = (WORK_TIME + REST_TIME) * TOTAL_ROUNDS;
+  document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').className = 'btn btn-main';
+  document.getElementById('configRow').style.display = 'flex';
+  buildRoundsDots();
+  updateUI();
+}
+
+function skipPhase() {
+  if (isWork) { isWork = false; timeLeft = REST_TIME; soundRest(); }
+  else {
+    currentRound++;
+    if (currentRound >= TOTAL_ROUNDS) { clearInterval(interval); running = false; showFinish(); return; }
+    isWork = true; timeLeft = WORK_TIME; soundWork();
+  }
+  updateUI();
+}
+
+function showFinish() {
+  document.getElementById('mainScreen').style.display = 'none';
+  document.getElementById('finishScreen').style.display = 'flex';
+}
+
+buildRoundsDots();
+updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

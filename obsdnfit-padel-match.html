@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Padel Match Simulation Timer — OBSDNFIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#09090e; --border:#1c1c28; --play:#16a34a; --change:#f59e0b; --rest:#38bdf8; --text:#e2e8f0; --muted:#475569; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:100; opacity:0.4; }
+  .glow { position:fixed; border-radius:50%; filter:blur(140px); pointer-events:none; transition:background 1.5s ease; }
+  .glow-1 { width:700px; height:700px; top:-250px; left:-250px; background:rgba(22,163,74,0.06); }
+  .countdown-overlay { position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; }
+  .cd-label { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:0.4em; color:var(--muted); }
+  .cd-number { font-family:'Bebas Neue',sans-serif; font-size:12rem; line-height:1; color:var(--play); animation:cdpulse 1s ease-in-out; }
+  .cd-sub { font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:0.25em; color:var(--muted); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+  .motivator { position:fixed; top:8%; left:50%; transform:translateX(-50%); font-family:'Bebas Neue',sans-serif; font-size:2.5rem; letter-spacing:0.35em; pointer-events:none; z-index:150; opacity:0; transition:opacity 0.3s ease; white-space:nowrap; }
+  .container { position:relative; z-index:10; width:100%; max-width:560px; padding:1.8rem 1.5rem; display:flex; flex-direction:column; align-items:center; gap:1.3rem; }
+  .header { width:100%; display:flex; justify-content:space-between; align-items:center; }
+  .title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:0.25em; color:var(--muted); }
+  .total-time { font-size:0.75rem; color:var(--muted); letter-spacing:0.1em; }
+  .overall-progress { width:100%; height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .overall-fill { height:100%; background:linear-gradient(90deg,var(--play),var(--change)); width:0%; transition:width 1s linear; }
+  .phase-label { font-family:'Bebas Neue',sans-serif; font-size:4.5rem; letter-spacing:0.2em; line-height:1; transition:color 0.4s ease; text-align:center; }
+  .timer-wrap { position:relative; width:250px; height:250px; }
+  .timer-svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .timer-track { fill:none; stroke:var(--border); stroke-width:3; }
+  .timer-progress { fill:none; stroke-width:3; stroke-linecap:round; transition:stroke-dashoffset 1s linear, stroke 0.4s ease; }
+  .timer-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; }
+  .timer-count { font-family:'Bebas Neue',sans-serif; font-size:4.5rem; line-height:1; letter-spacing:0.05em; transition:color 0.4s ease; }
+  .timer-unit { font-size:0.6rem; letter-spacing:0.2em; color:var(--muted); }
+  /* Set scoreboard */
+  .scoreboard { width:100%; display:flex; flex-direction:column; gap:6px; }
+  .score-label { font-size:0.58rem; letter-spacing:0.25em; color:var(--muted); text-align:center; }
+  .sets-display { display:flex; gap:8px; justify-content:center; }
+  .set-box { width:48px; height:48px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:0.1em; color:var(--muted); transition:all 0.4s ease; }
+  .set-box.done { border-color:var(--play); color:var(--play); background:rgba(22,163,74,0.08); }
+  .set-box.active { border-color:var(--play); color:var(--play); box-shadow:0 0 10px rgba(22,163,74,0.4); }
+  .set-box.change { border-color:var(--change); color:var(--change); box-shadow:0 0 10px rgba(245,158,11,0.4); }
+  /* Game info */
+  .game-info { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:0.2em; text-align:center; transition:color 0.4s ease; }
+  .game-tip { font-size:0.58rem; letter-spacing:0.12em; color:var(--muted); text-align:center; opacity:0.7; }
+  .stats-row { display:flex; gap:2rem; align-items:center; }
+  .stat-block { display:flex; flex-direction:column; align-items:center; gap:0.3rem; }
+  .stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; letter-spacing:0.1em; line-height:1; }
+  .stat-label { font-size:0.58rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; }
+  .sep { width:1px; height:36px; background:var(--border); }
+  .controls { display:flex; gap:1rem; align-items:center; }
+  .btn { background:none; border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.15em; padding:0.6rem 1.4rem; cursor:pointer; transition:all 0.2s ease; text-transform:uppercase; }
+  .btn:hover { border-color:var(--play); color:var(--play); }
+  .btn-main { background:var(--play); border-color:var(--play); color:#fff; font-size:0.75rem; padding:0.75rem 2.5rem; }
+  .btn-main:hover { background:#15803d; }
+  .btn-main.changing { background:var(--change); border-color:var(--change); color:#000; }
+  .btn-main.resting { background:var(--rest); border-color:var(--rest); color:#000; }
+  .lofi-tag { font-size:0.6rem; letter-spacing:0.2em; color:var(--muted); display:flex; align-items:center; gap:0.5rem; opacity:0.5; }
+  .lofi-dot { width:5px; height:5px; border-radius:50%; background:var(--play); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:1;transform:scale(1.3);} }
+  .finish-screen { display:none; flex-direction:column; align-items:center; gap:1.5rem; text-align:center; }
+  .finish-title { font-family:'Bebas Neue',sans-serif; font-size:5rem; letter-spacing:0.15em; color:var(--play); line-height:1; }
+  .finish-sub { font-size:0.7rem; letter-spacing:0.2em; color:var(--muted); }
+  .flash { animation:flash 0.3s ease; }
+  @keyframes flash { 0%{opacity:1;} 50%{opacity:0.15;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+<div class="glow glow-1" id="glow1"></div>
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">PADEL MATCH SIM</div>
+  <div class="cd-number" id="cdNumber">3</div>
+  <div class="cd-sub">3 SETS · MATCH FORMAT</div>
+</div>
+<div class="motivator" id="motivator"></div>
+<div class="container" id="mainScreen">
+  <div class="header">
+    <div class="title">OBSDNFIT × PADEL MATCH</div>
+    <div class="total-time" id="totalDisplay">75:00</div>
+  </div>
+  <div class="overall-progress"><div class="overall-fill" id="overallFill"></div></div>
+  <div class="phase-label" id="phaseLabel" style="color:var(--play)">PLAY</div>
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 250 250">
+      <circle class="timer-track" cx="125" cy="125" r="115"/>
+      <circle class="timer-progress" id="timerCircle" cx="125" cy="125" r="115" stroke="#16a34a" stroke-dasharray="722.57" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-inner">
+      <div class="timer-count" id="timerCount" style="color:var(--play)">20:00</div>
+      <div class="timer-unit" id="timerUnit">SET TIME</div>
+    </div>
+  </div>
+  <!-- Scoreboard -->
+  <div class="scoreboard">
+    <div class="score-label">SETS</div>
+    <div class="sets-display" id="setsDisplay"></div>
+  </div>
+  <div class="game-info" id="gameInfo" style="color:var(--play)">SET 1 — PLAY</div>
+  <div class="game-tip" id="gameTip">Stay aggressive · Control the net · Communicate with partner</div>
+  <div class="stats-row">
+    <div class="stat-block"><div class="stat-val" id="setDisplay">1</div><div class="stat-label">Set</div></div>
+    <div class="sep"></div>
+    <div class="stat-block"><div class="stat-val">3</div><div class="stat-label">Total</div></div>
+    <div class="sep"></div>
+    <div class="stat-block"><div class="stat-val" id="elapsedDisplay">0:00</div><div class="stat-label">Elapsed</div></div>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn btn-main" id="startBtn" onclick="startWithCountdown()">START</button>
+    <button class="btn" onclick="skipPhase()">SKIP</button>
+  </div>
+  <div class="lofi-tag"><div class="lofi-dot"></div>LO-FI MODE — ADD YOUR MUSIC</div>
+</div>
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title">MATCH OVER.</div>
+  <div class="finish-sub">3 SETS · 75 MINUTES</div>
+  <div class="finish-sub" style="margin-top:0.5rem;color:var(--play)">WELL DONE.</div>
+  <button class="btn btn-main" onclick="resetTimer();document.getElementById('finishScreen').style.display='none';document.getElementById('mainScreen').style.display='flex';" style="margin-top:1rem">RESTART</button>
+</div>
+<script>
+// Match structure: SET(20min) → CHANGE(90s) → SET(20min) → CHANGE(90s) → SET(20min) → END
+const STRUCTURE=[
+  {type:'play',  label:'PLAY',        dur:1200, tip:'Stay aggressive · Control the net · Communicate',      color:'#16a34a', set:1},
+  {type:'change',label:'CHANGE ENDS', dur:90,   tip:'Hydrate · Towel off · Discuss tactics with partner',   color:'#f59e0b', set:1},
+  {type:'play',  label:'PLAY',        dur:1200, tip:'Adjust tactics · Target opponent weaknesses',          color:'#16a34a', set:2},
+  {type:'change',label:'CHANGE ENDS', dur:90,   tip:'Final set · Leave everything on court',                color:'#f59e0b', set:2},
+  {type:'play',  label:'PLAY',        dur:1200, tip:'Final set · Maximum intensity · Every point counts',   color:'#16a34a', set:3},
+];
+const totalSec=STRUCTURE.reduce((s,b)=>s+b.dur,0);
+const circ=722.57;
+let cur=0,timeLeft=STRUCTURE[0].dur,running=false,interval=null,elapsed=0;
+function fmt(s){return Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0');}
+function buildSets(){const d=document.getElementById('setsDisplay');d.innerHTML='';for(let i=0;i<3;i++){const b=document.createElement('div');b.className='set-box';b.id=`sb-${i}`;b.textContent=i+1;d.appendChild(b);}}
+function updateUI(){
+  const b=STRUCTURE[cur];
+  document.getElementById('timerCircle').style.strokeDashoffset=circ*(1-timeLeft/b.dur);
+  document.getElementById('timerCount').textContent=fmt(timeLeft);
+  document.getElementById('timerCircle').style.stroke=b.color;
+  document.getElementById('timerCount').style.color=b.color;
+  document.getElementById('phaseLabel').textContent=b.label;
+  document.getElementById('phaseLabel').style.color=b.color;
+  document.getElementById('gameInfo').textContent=`SET ${b.set} — ${b.label}`;
+  document.getElementById('gameInfo').style.color=b.color;
+  document.getElementById('gameTip').textContent=b.tip;
+  document.getElementById('setDisplay').textContent=b.set;
+  document.getElementById('timerUnit').textContent=b.type==='play'?'SET TIME':'CHANGE';
+  if(b.type==='play'){document.getElementById('startBtn').className='btn btn-main';document.getElementById('glow1').style.background='rgba(22,163,74,0.08)';}
+  else if(b.type==='change'){document.getElementById('startBtn').className='btn btn-main changing';document.getElementById('glow1').style.background='rgba(245,158,11,0.07)';}
+  document.getElementById('elapsedDisplay').textContent=fmt(elapsed);
+  document.getElementById('overallFill').style.width=(elapsed/totalSec*100)+'%';
+  document.getElementById('totalDisplay').textContent=fmt(Math.max(0,totalSec-elapsed));
+  // Set boxes
+  for(let i=0;i<3;i++){const sb=document.getElementById(`sb-${i}`);if(!sb)continue;const setNum=i+1;if(setNum<b.set)sb.className='set-box done';else if(setNum===b.set)sb.className=b.type==='change'?'set-box change':'set-box active';else sb.className='set-box';}
+}
+function showMotivator(t,c){const e=document.getElementById('motivator');e.textContent=t;e.style.color=c;e.style.opacity='1';setTimeout(()=>{e.style.opacity='0';},2000);}
+function tick(){
+  if(timeLeft>0){timeLeft--;elapsed++;if(STRUCTURE[cur].type==='play'&&timeLeft===60)showMotivator('1 MIN LEFT!','#f59e0b');if(timeLeft===10)showMotivator('10 SECONDS!',STRUCTURE[cur].color);updateUI();}
+  else{document.body.classList.add('flash');setTimeout(()=>document.body.classList.remove('flash'),300);cur++;if(cur>=STRUCTURE.length){clearInterval(interval);running=false;showMotivator('MATCH OVER.','#16a34a');soundFinish();setTimeout(showFinish,1500);return;}timeLeft=STRUCTURE[cur].dur;showMotivator(STRUCTURE[cur].label,STRUCTURE[cur].color);updateUI();}
+}
+function startWithCountdown(){const btn=document.getElementById('startBtn');if(running){clearInterval(interval);running=false;btn.textContent='RESUME';return;}if(elapsed===0){const ov=document.getElementById('countdownOverlay');const cdN=document.getElementById('cdNumber');ov.style.display='flex';let count=3;cdN.textContent=count;const cdI=setInterval(()=>{count--;if(count===0){clearInterval(cdI);ov.style.display='none';interval=setInterval(tick,1000);running=true;btn.textContent='PAUSE';showMotivator('PLAY!','#16a34a');}else{cdN.textContent=count;cdN.style.animation='none';cdN.offsetHeight;cdN.style.animation='cdpulse 1s ease-in-out';}},1000);}else{interval=setInterval(tick,1000);running=true;btn.textContent='PAUSE';}}
+function resetTimer(){clearInterval(interval);running=false;cur=0;timeLeft=STRUCTURE[0].dur;elapsed=0;document.getElementById('startBtn').textContent='START';document.getElementById('startBtn').className='btn btn-main';buildSets();updateUI();}
+function skipPhase(){cur++;if(cur>=STRUCTURE.length){clearInterval(interval);running=false;showFinish();return;}timeLeft=STRUCTURE[cur].dur;updateUI();}
+function showFinish(){document.getElementById('mainScreen').style.display='none';document.getElementById('finishScreen').style.display='flex';}
+buildSets();updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muay Thai Timer — 5 Rounds — OBSDNFIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090e; --border: #1c1c28;
+    --work: #b91c1c; --rest: #38bdf8;
+    --gold: #d97706; --text: #e2e8f0; --muted: #475569;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:100; opacity:0.4; }
+
+  .glow { position:fixed; border-radius:50%; filter:blur(140px); pointer-events:none; transition:background 1.5s ease; }
+  .glow-1 { width:700px; height:700px; top:-250px; left:-250px; background:rgba(185,28,28,0.07); }
+  .glow-2 { width:400px; height:400px; bottom:-100px; right:-100px; background:rgba(217,119,6,0.04); }
+
+  /* Thai decorative top border */
+  .thai-border { position:fixed; top:0; left:0; width:100%; height:3px; background:linear-gradient(90deg, var(--gold), var(--work), var(--gold)); z-index:50; }
+  .thai-border-b { position:fixed; bottom:0; left:0; width:100%; height:2px; background:linear-gradient(90deg, transparent, var(--work), transparent); z-index:50; }
+
+  .countdown-overlay { position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; }
+  .cd-label { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:0.4em; color:var(--muted); }
+  .cd-number { font-family:'Bebas Neue',sans-serif; font-size:12rem; line-height:1; color:var(--work); animation:cdpulse 1s ease-in-out; }
+  .cd-sub { font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:0.25em; color:var(--gold); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+
+  .motivator { position:fixed; top:8%; left:50%; transform:translateX(-50%); font-family:'Bebas Neue',sans-serif; font-size:2.8rem; letter-spacing:0.35em; pointer-events:none; z-index:150; opacity:0; transition:opacity 0.3s ease; white-space:nowrap; }
+
+  .container { position:relative; z-index:10; width:100%; max-width:560px; padding:1.8rem 1.5rem; display:flex; flex-direction:column; align-items:center; gap:1.4rem; }
+
+  .header { width:100%; display:flex; justify-content:space-between; align-items:center; }
+  .title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:0.25em; color:var(--muted); }
+  .total-time { font-size:0.75rem; color:var(--muted); letter-spacing:0.1em; }
+
+  .overall-progress { width:100%; height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .overall-fill { height:100%; background:linear-gradient(90deg,var(--work),var(--gold)); width:0%; transition:width 1s linear; }
+
+  /* Phase */
+  .phase-label { font-family:'Bebas Neue',sans-serif; font-size:4.5rem; letter-spacing:0.2em; line-height:1; transition:color 0.4s ease; text-align:center; }
+  .phase-label.work { color:var(--work); }
+  .phase-label.rest { color:var(--rest); }
+  .phase-label.corner { color:var(--gold); }
+
+  /* Timer */
+  .timer-wrap { position:relative; width:260px; height:260px; }
+  .timer-svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .timer-track { fill:none; stroke:var(--border); stroke-width:3; }
+  .timer-progress { fill:none; stroke-width:3; stroke-linecap:butt; transition:stroke-dashoffset 1s linear, stroke 0.4s ease; }
+  .timer-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; }
+  .timer-count { font-family:'Bebas Neue',sans-serif; font-size:5rem; line-height:1; letter-spacing:0.05em; transition:color 0.4s ease; }
+  .timer-unit { font-size:0.6rem; letter-spacing:0.2em; color:var(--muted); }
+
+  /* Round badge */
+  .round-badge { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .round-label { font-size:0.58rem; letter-spacing:0.3em; color:var(--muted); }
+  .round-num { font-family:'Bebas Neue',sans-serif; font-size:3.5rem; letter-spacing:0.1em; color:var(--gold); line-height:1; }
+  .round-total { font-size:0.58rem; letter-spacing:0.2em; color:var(--muted); }
+
+  /* Technique cue */
+  .technique-cue { font-size:0.62rem; letter-spacing:0.2em; color:var(--muted); text-align:center; min-height:1rem; transition:color 0.4s ease; }
+
+  /* Rounds row — 5 squares */
+  .rounds-row { display:flex; gap:8px; align-items:center; }
+  .round-sq { width:44px; height:44px; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:0.1em; color:var(--muted); transition:all 0.4s ease; }
+  .round-sq.done { background:var(--work); border-color:var(--work); color:#fff; opacity:0.5; }
+  .round-sq.active { background:var(--work); border-color:var(--work); color:#fff; box-shadow:0 0 12px rgba(185,28,28,0.6); }
+  .round-sq.corner-active { background:var(--gold); border-color:var(--gold); color:#000; box-shadow:0 0 10px rgba(217,119,6,0.5); }
+
+  /* Stats */
+  .stats-row { display:flex; gap:2rem; align-items:center; }
+  .stat-block { display:flex; flex-direction:column; align-items:center; gap:0.3rem; }
+  .stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; letter-spacing:0.1em; line-height:1; }
+  .stat-label { font-size:0.58rem; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; }
+  .sep { width:1px; height:36px; background:var(--border); }
+
+  .controls { display:flex; gap:1rem; align-items:center; }
+  .btn { background:none; border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.15em; padding:0.6rem 1.4rem; cursor:pointer; transition:all 0.2s ease; text-transform:uppercase; }
+  .btn:hover { border-color:var(--work); color:var(--work); }
+  .btn-main { background:var(--work); border-color:var(--work); color:#fff; font-size:0.75rem; padding:0.75rem 2.5rem; }
+  .btn-main:hover { background:#991b1b; }
+  .btn-main.resting { background:var(--rest); border-color:var(--rest); color:#000; }
+  .btn-main.corner { background:var(--gold); border-color:var(--gold); color:#000; }
+
+  .lofi-tag { font-size:0.6rem; letter-spacing:0.2em; color:var(--muted); display:flex; align-items:center; gap:0.5rem; opacity:0.5; }
+  .lofi-dot { width:5px; height:5px; border-radius:50%; background:var(--gold); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:1;transform:scale(1.3);} }
+
+  .finish-screen { display:none; flex-direction:column; align-items:center; gap:1.5rem; text-align:center; }
+  .finish-title { font-family:'Bebas Neue',sans-serif; font-size:5rem; letter-spacing:0.15em; color:var(--gold); line-height:1; }
+  .finish-sub { font-size:0.7rem; letter-spacing:0.2em; color:var(--muted); }
+
+  .bell-flash { position:fixed; inset:0; pointer-events:none; z-index:190; opacity:0; transition:opacity 0.1s; }
+  .flash { animation:flash 0.4s ease; }
+  @keyframes flash { 0%{opacity:1;} 40%{opacity:0.1;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+
+<div class="thai-border"></div>
+<div class="thai-border-b"></div>
+<div class="bell-flash" id="bellFlash"></div>
+<div class="glow glow-1" id="glow1"></div>
+<div class="glow glow-2"></div>
+
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">MUAY THAI</div>
+  <div class="cd-number" id="cdNumber">3</div>
+  <div class="cd-sub">5 ROUNDS · 3 MIN · 1 MIN REST</div>
+</div>
+
+<div class="motivator" id="motivator"></div>
+
+<div class="container" id="mainScreen">
+  <div class="header">
+    <div class="title">OBSDNFIT × MUAY THAI</div>
+    <div class="total-time" id="totalDisplay">20:00</div>
+  </div>
+
+  <div class="overall-progress"><div class="overall-fill" id="overallFill"></div></div>
+
+  <div class="phase-label work" id="phaseLabel">ROUND 1</div>
+
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 260 260">
+      <circle class="timer-track" cx="130" cy="130" r="120"/>
+      <circle class="timer-progress" id="timerCircle" cx="130" cy="130" r="120"
+        stroke="#b91c1c" stroke-dasharray="753.98" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-inner">
+      <div class="timer-count" id="timerCount" style="color:var(--work)">3:00</div>
+      <div class="timer-unit" id="timerUnit"></div>
+    </div>
+  </div>
+
+  <div class="technique-cue" id="techniqueCue">JAB · CROSS · TEEP · LOW KICK</div>
+
+  <!-- 5 round squares -->
+  <div class="rounds-row" id="roundsRow">
+    <div class="round-sq active" id="rsq-0">1</div>
+    <div class="round-sq" id="rsq-1">2</div>
+    <div class="round-sq" id="rsq-2">3</div>
+    <div class="round-sq" id="rsq-3">4</div>
+    <div class="round-sq" id="rsq-4">5</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-block">
+      <div class="stat-val" id="roundDisplay">1</div>
+      <div class="stat-label">Round</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat-block">
+      <div class="stat-val">5</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat-block">
+      <div class="stat-val" id="elapsedDisplay">0:00</div>
+      <div class="stat-label">Elapsed</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn btn-main" id="startBtn" onclick="startWithCountdown()">START</button>
+    <button class="btn" onclick="skipPhase()">SKIP</button>
+  </div>
+
+  <div class="lofi-tag"><div class="lofi-dot"></div>LO-FI MODE — ADD YOUR MUSIC</div>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title">FIGHT OVER.</div>
+  <div class="finish-sub">5 ROUNDS — 20 MINUTES</div>
+  <div class="finish-sub" style="margin-top:0.5rem;color:var(--work)">WELL DONE.</div>
+  <button class="btn btn-main" onclick="resetTimer();document.getElementById('finishScreen').style.display='none';document.getElementById('mainScreen').style.display='flex';" style="margin-top:1rem">RESTART</button>
+</div>
+
+<script>
+const WORK_TIME = 180; // 3 min
+const REST_TIME = 60;  // 1 min
+const TOTAL_ROUNDS = 5;
+const circumference = 753.98;
+
+const TECHNIQUES = [
+  "JAB · CROSS · TEEP · LOW KICK",
+  "ROUNDHOUSE · ELBOW · KNEE · GUARD",
+  "PUSH KICK · BODY SHOT · HEAD KICK",
+  "CLINCH WORK · KNEE STRIKES · SWEEP",
+  "FULL COMBINATIONS · MAX EFFORT",
+];
+
+const CORNER_CUES = [
+  "BREATHE · HANDS UP · STAY LOOSE",
+  "GOOD WORK · RECOVER · NEXT ROUND",
+  "HALFWAY · STAY STRONG · BREATHE",
+  "ALMOST THERE · LAST ROUNDS",
+  "",
+];
+
+let currentRound = 0;
+let isWork = true;
+let timeLeft = WORK_TIME;
+let running = false;
+let interval = null;
+let elapsedSeconds = 0;
+const totalSeconds = (WORK_TIME + REST_TIME) * TOTAL_ROUNDS;
+
+function fmt(s) { return Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0'); }
+
+function ringBell_orig() {
+  const f = document.getElementById('bellFlash');
+  f.style.background = isWork ? 'rgba(185,28,28,0.2)' : 'rgba(217,119,6,0.15)';
+  f.style.opacity = '1';
+  setTimeout(() => { f.style.opacity = '0'; }, 350);
+  document.body.classList.add('flash');
+  setTimeout(() => document.body.classList.remove('flash'), 400);
+}
+
+function updateUI() {
+  const duration = isWork ? WORK_TIME : REST_TIME;
+  const offset = circumference * (1 - timeLeft / duration);
+  document.getElementById('timerCircle').style.strokeDashoffset = offset;
+  document.getElementById('timerCount').textContent = fmt(timeLeft);
+
+  if (isWork) {
+    document.getElementById('phaseLabel').textContent = `ROUND ${currentRound + 1}`;
+    document.getElementById('phaseLabel').className = 'phase-label work';
+    document.getElementById('timerCount').style.color = 'var(--work)';
+    document.getElementById('timerCircle').style.stroke = '#b91c1c';
+    document.getElementById('techniqueCue').textContent = TECHNIQUES[currentRound] || '';
+    document.getElementById('techniqueCue').style.color = 'rgba(255,255,255,0.4)';
+    document.getElementById('startBtn').className = 'btn btn-main';
+    document.getElementById('glow1').style.background = 'rgba(185,28,28,0.08)';
+    // Last 10s — intensity
+    if (timeLeft <= 10) document.getElementById('glow1').style.background = 'rgba(185,28,28,0.18)';
+  } else {
+    document.getElementById('phaseLabel').textContent = 'CORNER';
+    document.getElementById('phaseLabel').className = 'phase-label corner';
+    document.getElementById('timerCount').style.color = 'var(--gold)';
+    document.getElementById('timerCircle').style.stroke = '#d97706';
+    document.getElementById('techniqueCue').textContent = CORNER_CUES[currentRound] || '';
+    document.getElementById('techniqueCue').style.color = 'rgba(217,119,6,0.6)';
+    document.getElementById('startBtn').className = 'btn btn-main corner';
+    document.getElementById('glow1').style.background = 'rgba(217,119,6,0.06)';
+  }
+
+  document.getElementById('roundDisplay').textContent = currentRound + 1;
+  document.getElementById('elapsedDisplay').textContent = fmt(elapsedSeconds);
+
+  const pct = (elapsedSeconds / totalSeconds) * 100;
+  document.getElementById('overallFill').style.width = pct + '%';
+  document.getElementById('totalDisplay').textContent = fmt(Math.max(0, totalSeconds - elapsedSeconds));
+
+  // Round squares
+  for (let i = 0; i < TOTAL_ROUNDS; i++) {
+    const sq = document.getElementById(`rsq-${i}`);
+    if (!sq) continue;
+    if (i < currentRound) sq.className = 'round-sq done';
+    else if (i === currentRound) sq.className = isWork ? 'round-sq active' : 'round-sq corner-active';
+    else sq.className = 'round-sq';
+  }
+}
+
+function showMotivator(t, c) {
+  const e = document.getElementById('motivator');
+  e.textContent = t; e.style.color = c; e.style.opacity = '1';
+  setTimeout(() => { e.style.opacity = '0'; }, 2000);
+}
+
+function tick() {
+  if (timeLeft > 0) {
+    timeLeft--; elapsedSeconds++;
+    if (isWork && timeLeft === 10) showMotivator('10 SECONDS!', '#b91c1c');
+    if (!isWork && timeLeft === 10) showMotivator('ROUND ' + (currentRound + 2) + ' SOON', '#d97706');
+    updateUI();
+  } else {
+    soundBell();ringBell_orig();
+    if (isWork) {
+      isWork = false; timeLeft = REST_TIME; soundRest();
+      showMotivator('CORNER.', '#d97706');
+    } else {
+      currentRound++;
+      if (currentRound >= TOTAL_ROUNDS) {
+        clearInterval(interval); running = false;
+        showMotivator('FIGHT OVER.', '#d97706');
+        soundFinish();setTimeout(showFinish, 1500); return;
+      }
+      isWork = true; timeLeft = WORK_TIME; soundWork();
+      showMotivator(`ROUND ${currentRound + 1} — FIGHT!`, '#b91c1c');
+    }
+    updateUI();
+  }
+}
+
+function startWithCountdown() {
+  const btn = document.getElementById('startBtn');
+  if (running) { clearInterval(interval); running = false; btn.textContent = 'RESUME'; return; }
+  if (elapsedSeconds === 0) {
+    const ov = document.getElementById('countdownOverlay'); const cdN = document.getElementById('cdNumber');
+    ov.style.display = 'flex'; let count = 3; cdN.textContent = count;
+    const cdI = setInterval(() => {
+      count--;
+      if (count === 0) { clearInterval(cdI); ov.style.display = 'none'; interval = setInterval(tick, 1000); running = true; btn.textContent = 'PAUSE'; showMotivator('FIGHT!', '#b91c1c'); }
+      else { cdN.textContent = count; cdN.style.animation = 'none'; cdN.offsetHeight; cdN.style.animation = 'cdpulse 1s ease-in-out'; }
+    }, 1000);
+  } else { interval = setInterval(tick, 1000); running = true; btn.textContent = 'PAUSE'; }
+}
+
+function resetTimer() {
+  clearInterval(interval); running = false;
+  currentRound = 0; isWork = true; timeLeft = WORK_TIME; soundWork(); elapsedSeconds = 0;
+  document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').className = 'btn btn-main';
+  updateUI();
+}
+
+function skipPhase() {
+  if (isWork) { isWork = false; timeLeft = REST_TIME; soundRest(); }
+  else { currentRound++; if (currentRound >= TOTAL_ROUNDS) { clearInterval(interval); running = false; showFinish(); return; } isWork = true; timeLeft = WORK_TIME; soundWork(); }
+  updateUI();
+}
+
+function showFinish() { document.getElementById('mainScreen').style.display = 'none'; document.getElementById('finishScreen').style.display = 'flex'; }
+
+updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

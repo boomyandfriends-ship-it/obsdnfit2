@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swimming Coach Timer — OBSDNFIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#09090e; --border:#1c1c28; --text:#e2e8f0; --muted:#475569; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:100; opacity:0.4; }
+  .glow { position:fixed; border-radius:50%; filter:blur(160px); pointer-events:none; transition:background 1.5s ease; }
+  .glow-1 { width:900px; height:900px; top:-300px; left:-300px; }
+
+  .countdown-overlay { position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; }
+  .cd-label { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:0.4em; color:var(--muted); }
+  .cd-number { font-family:'Bebas Neue',sans-serif; font-size:20rem; line-height:1; color:#0ea5e9; animation:cdpulse 1s ease-in-out; }
+  .cd-sub { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:0.3em; color:var(--muted); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+
+  .motivator { position:fixed; top:6%; left:50%; transform:translateX(-50%); font-family:'Bebas Neue',sans-serif; font-size:3rem; letter-spacing:0.35em; pointer-events:none; z-index:150; opacity:0; transition:opacity 0.3s ease; white-space:nowrap; }
+
+  /* TOP BAR */
+  .top-bar { position:fixed; top:0; left:0; width:100%; height:5px; background:var(--border); z-index:20; }
+  .top-fill { height:100%; width:0%; transition:width 1s linear; }
+  .small-header { position:fixed; top:14px; width:100%; display:flex; justify-content:space-between; padding:0 2.5rem; z-index:20; }
+  .sh-item { font-size:0.75rem; letter-spacing:0.2em; color:var(--muted); }
+
+  /* MAIN CONTENT — huge, readable at 5-10m */
+  .screen { position:relative; z-index:10; width:100%; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; padding:1rem; }
+
+  /* PHASE — fills most of screen */
+  .phase-mega { font-family:'Bebas Neue',sans-serif; font-size:min(28vw,220px); line-height:0.9; letter-spacing:0.05em; text-align:center; transition:color 0.4s ease; }
+
+  /* CHRONO */
+  .chrono-mega { font-family:'Bebas Neue',sans-serif; font-size:min(22vw,180px); line-height:1; letter-spacing:0.05em; text-align:center; transition:color 0.4s ease; }
+
+  /* SET INFO */
+  .set-info { font-family:'Bebas Neue',sans-serif; font-size:min(6vw,50px); letter-spacing:0.2em; text-align:center; transition:color 0.4s ease; }
+
+  /* NEXT */
+  .next-info { font-family:'DM Mono',monospace; font-size:min(3vw,24px); letter-spacing:0.25em; color:var(--muted); text-align:center; }
+
+  /* Divider */
+  .divider { width:60%; height:3px; transition:background 0.4s ease; }
+
+  /* Config panel */
+  .config-panel { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center; z-index:20; }
+  .cfg-btn { font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.15em; color:var(--muted); border:1px solid var(--border); padding:4px 10px; cursor:pointer; background:none; transition:all 0.2s ease; text-transform:uppercase; }
+  .cfg-btn:hover { border-color:#0ea5e9; color:#0ea5e9; }
+  .cfg-btn.active { border-color:#0ea5e9; color:#0ea5e9; background:rgba(14,165,233,0.08); }
+
+  .controls { position:fixed; bottom:4rem; right:2rem; display:flex; gap:0.8rem; }
+  .btn { background:none; border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.15em; padding:0.5rem 1rem; cursor:pointer; transition:all 0.2s ease; text-transform:uppercase; opacity:0.5; }
+  .btn:hover { opacity:1; }
+
+  /* Interval dots */
+  .interval-dots { position:fixed; bottom:2.5rem; left:2.5rem; display:flex; gap:5px; }
+  .idot { width:10px; height:10px; border-radius:2px; background:var(--border); transition:all 0.4s ease; }
+  .idot.done { opacity:0.4; }
+  .idot.active { box-shadow:0 0 6px currentColor; }
+
+  .finish-screen { display:none; flex-direction:column; align-items:center; gap:2rem; text-align:center; }
+  .finish-title { font-family:'Bebas Neue',sans-serif; font-size:min(20vw,160px); letter-spacing:0.1em; line-height:1; color:#0ea5e9; }
+  .finish-sub { font-size:0.8rem; letter-spacing:0.3em; color:var(--muted); }
+
+  .flash { animation:flash 0.3s ease; }
+  @keyframes flash { 0%{opacity:1;} 50%{opacity:0.1;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1" id="glow1"></div>
+<div class="top-bar"><div class="top-fill" id="topFill"></div></div>
+<div class="small-header">
+  <div class="sh-item">OBSDNFIT × SWIM COACH</div>
+  <div class="sh-item" id="shRight">30:00</div>
+</div>
+
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">SWIM COACH TIMER</div>
+  <div class="cd-number" id="cdNumber">3</div>
+  <div class="cd-sub" id="cdSub">POOLSIDE DISPLAY</div>
+</div>
+
+<div class="motivator" id="motivator"></div>
+
+<div class="screen" id="mainScreen">
+  <div class="phase-mega" id="phaseMega" style="color:#0ea5e9">SWIM</div>
+  <div class="divider" id="divider" style="background:#0ea5e9"></div>
+  <div class="chrono-mega" id="chronoMega" style="color:#0ea5e9">1:30</div>
+  <div class="set-info" id="setInfo" style="color:rgba(14,165,233,0.5)">SET 1 / 6</div>
+  <div class="next-info" id="nextInfo">NEXT → REST 30s</div>
+</div>
+
+<!-- Config -->
+<div class="config-panel" id="configPanel">
+  <span style="font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);">SWIM:</span>
+  <button class="cfg-btn" onclick="setWork(60)">1 MIN</button>
+  <button class="cfg-btn active" onclick="setWork(90)">1:30</button>
+  <button class="cfg-btn" onclick="setWork(120)">2 MIN</button>
+  <button class="cfg-btn" onclick="setWork(180)">3 MIN</button>
+  <span style="font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);margin-left:8px;">REST:</span>
+  <button class="cfg-btn" onclick="setRest(20)">20s</button>
+  <button class="cfg-btn active" onclick="setRest(30)">30s</button>
+  <button class="cfg-btn" onclick="setRest(60)">1 MIN</button>
+  <span style="font-size:0.6rem;letter-spacing:0.2em;color:var(--muted);margin-left:8px;">SETS:</span>
+  <button class="cfg-btn" onclick="setSets(4)">4</button>
+  <button class="cfg-btn active" onclick="setSets(6)">6</button>
+  <button class="cfg-btn" onclick="setSets(8)">8</button>
+  <button class="cfg-btn" onclick="setSets(10)">10</button>
+</div>
+
+<div class="interval-dots" id="intervalDots"></div>
+
+<div class="controls">
+  <button class="btn" onclick="resetTimer()">RESET</button>
+  <button class="btn" id="startBtn" onclick="startWithCountdown()">START</button>
+  <button class="btn" onclick="skipPhase()">SKIP</button>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title">DONE.</div>
+  <div class="finish-sub" id="finishSub">6 SETS COMPLETE</div>
+  <div class="finish-sub" style="color:#0ea5e9;margin-top:0.5rem">WELL DONE.</div>
+  <button class="btn" style="opacity:1;border-color:#0ea5e9;color:#0ea5e9;margin-top:1rem" onclick="resetTimer();document.getElementById('finishScreen').style.display='none';document.getElementById('mainScreen').style.display='flex';">RESTART</button>
+</div>
+
+<script>
+let WORK_TIME=90, REST_TIME=30, TOTAL_SETS=6;
+let currentSet=0, isWork=true, timeLeft=WORK_TIME;
+let running=false, interval=null, elapsed=0;
+let totalSeconds=(WORK_TIME+REST_TIME)*TOTAL_SETS;
+const circumference=722.57;
+
+function fmt(s){return Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0');}
+
+function setWork(t){if(running)return;WORK_TIME=t;totalSeconds=(WORK_TIME+REST_TIME)*TOTAL_SETS;document.querySelectorAll('.cfg-btn').forEach(b=>{if(b.textContent===fmt(t)||b.textContent===t+'s'||b.textContent===t+' MIN')b.classList.add('active');else if(['1 MIN','1:30','2 MIN','3 MIN'].includes(b.textContent))b.classList.remove('active');});resetTimer();}
+function setRest(t){if(running)return;REST_TIME=t;totalSeconds=(WORK_TIME+REST_TIME)*TOTAL_SETS;document.querySelectorAll('.cfg-btn').forEach(b=>{if(b.textContent===t+'s'||b.textContent===fmt(t))b.classList.add('active');else if(['20s','30s','1 MIN'].includes(b.textContent))b.classList.remove('active');});resetTimer();}
+function setSets(n){if(running)return;TOTAL_SETS=n;totalSeconds=(WORK_TIME+REST_TIME)*TOTAL_SETS;document.querySelectorAll('.cfg-btn').forEach(b=>{if(b.textContent===String(n))b.classList.add('active');else if(['4','6','8','10'].includes(b.textContent))b.classList.remove('active');});resetTimer();}
+
+function buildDots(){const row=document.getElementById('intervalDots');row.innerHTML='';for(let i=0;i<TOTAL_SETS;i++){const d=document.createElement('div');d.className='idot';d.id=`id-${i}`;d.style.background='#0ea5e9';d.style.color='#0ea5e9';row.appendChild(d);}}
+
+function updateUI(){
+  document.getElementById('chronoMega').textContent=fmt(timeLeft);
+  if(isWork){
+    document.getElementById('phaseMega').textContent='SWIM';
+    document.getElementById('phaseMega').style.color='#0ea5e9';
+    document.getElementById('chronoMega').style.color='#0ea5e9';
+    document.getElementById('divider').style.background='#0ea5e9';
+    document.getElementById('setInfo').textContent=`SET ${currentSet+1} / ${TOTAL_SETS}`;
+    document.getElementById('setInfo').style.color='rgba(14,165,233,0.5)';
+    document.getElementById('nextInfo').textContent=`NEXT → REST ${fmt(REST_TIME)}`;
+    document.getElementById('glow1').style.background='rgba(14,165,233,0.08)';
+    if(timeLeft<=10){document.getElementById('phaseMega').style.color='#f97316';document.getElementById('chronoMega').style.color='#f97316';}
+  } else {
+    document.getElementById('phaseMega').textContent='REST';
+    document.getElementById('phaseMega').style.color='#6366f1';
+    document.getElementById('chronoMega').style.color='#6366f1';
+    document.getElementById('divider').style.background='#6366f1';
+    document.getElementById('setInfo').textContent=`SET ${currentSet+2} / ${TOTAL_SETS} NEXT`;
+    document.getElementById('setInfo').style.color='rgba(99,102,241,0.5)';
+    document.getElementById('nextInfo').textContent=`PREPARE FOR NEXT SET`;
+    document.getElementById('glow1').style.background='rgba(99,102,241,0.06)';
+  }
+  document.getElementById('topFill').style.width=(elapsed/totalSeconds*100)+'%';
+  document.getElementById('topFill').style.background=isWork?'#0ea5e9':'#6366f1';
+  document.getElementById('shRight').textContent=fmt(Math.max(0,totalSeconds-elapsed));
+  for(let i=0;i<TOTAL_SETS;i++){const d=document.getElementById(`id-${i}`);if(!d)continue;if(i<currentSet)d.className='idot done';else if(i===currentSet)d.className='idot active';else d.className='idot';}
+}
+
+function showMotivator(t,c){const e=document.getElementById('motivator');e.textContent=t;e.style.color=c;e.style.opacity='1';setTimeout(()=>{e.style.opacity='0';},2000);}
+
+function tick(){
+  if(timeLeft>0){timeLeft--;elapsed++;if(isWork&&timeLeft<=10)showMotivator(timeLeft>0?timeLeft+'...':'GO!',timeLeft>3?'#f97316':'#ef4444');updateUI();}
+  else{document.body.classList.add('flash');setTimeout(()=>document.body.classList.remove('flash'),300);
+    if(isWork){isWork=false;timeLeft=REST_TIME;soundRest();showMotivator('REST','#6366f1');}
+    else{currentSet++;if(currentSet>=TOTAL_SETS){clearInterval(interval);running=false;document.getElementById('finishSub').textContent=`${TOTAL_SETS} SETS COMPLETE`;showMotivator('WELL DONE.','#0ea5e9');soundFinish();setTimeout(showFinish,1500);return;}isWork=true;timeLeft=WORK_TIME;soundWork();showMotivator('SWIM!','#0ea5e9');}
+    updateUI();}
+}
+
+function startWithCountdown(){
+  const btn=document.getElementById('startBtn');
+  if(running){clearInterval(interval);running=false;btn.textContent='RESUME';return;}
+  if(elapsed===0){
+    document.getElementById('configPanel').style.display='none';
+    const ov=document.getElementById('countdownOverlay');const cdN=document.getElementById('cdNumber');
+    document.getElementById('cdSub').textContent=`${TOTAL_SETS} SETS · ${fmt(WORK_TIME)} SWIM · ${fmt(REST_TIME)} REST`;
+    ov.style.display='flex';let count=3;cdN.textContent=count;
+    const cdI=setInterval(()=>{count--;if(count===0){clearInterval(cdI);ov.style.display='none';interval=setInterval(tick,1000);running=true;btn.textContent='PAUSE';showMotivator('SWIM!','#0ea5e9');}else{cdN.textContent=count;cdN.style.animation='none';cdN.offsetHeight;cdN.style.animation='cdpulse 1s ease-in-out';}},1000);
+  } else {interval=setInterval(tick,1000);running=true;btn.textContent='PAUSE';}
+}
+
+function resetTimer(){clearInterval(interval);running=false;currentSet=0;isWork=true;timeLeft=WORK_TIME;soundWork();elapsed=0;totalSeconds=(WORK_TIME+REST_TIME)*TOTAL_SETS;document.getElementById('startBtn').textContent='START';document.getElementById('configPanel').style.display='flex';buildDots();updateUI();}
+function skipPhase(){if(isWork){isWork=false;timeLeft=REST_TIME;soundRest();}else{currentSet++;if(currentSet>=TOTAL_SETS){clearInterval(interval);running=false;showFinish();return;}isWork=true;timeLeft=WORK_TIME;soundWork();}updateUI();}
+function showFinish(){document.getElementById('mainScreen').style.display='none';document.getElementById('finishScreen').style.display='flex';}
+
+buildDots();updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

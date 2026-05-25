@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indoor Cycling Coach 45 Min | No Music — OBSDNFIT</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#09090e; --border:#1c1c28; --text:#e2e8f0; --muted:#475569; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:100; opacity:0.4; }
+
+  .glow { position:fixed; border-radius:50%; filter:blur(160px); pointer-events:none; transition:background 1.5s ease; }
+  .glow-1 { width:900px; height:900px; top:-300px; left:-300px; }
+
+  .countdown-overlay { position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; }
+  .cd-label { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:0.4em; color:var(--muted); }
+  .cd-number { font-family:'Bebas Neue',sans-serif; font-size:20rem; line-height:1; animation:cdpulse 1s ease-in-out; }
+  .cd-sub { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:0.3em; color:var(--muted); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+
+  .motivator { position:fixed; top:6%; left:50%; transform:translateX(-50%); font-family:'Bebas Neue',sans-serif; font-size:3rem; letter-spacing:0.35em; pointer-events:none; z-index:150; opacity:0; transition:opacity 0.3s ease; white-space:nowrap; }
+
+  /* FULL SCREEN LAYOUT — readable at 2 meters */
+  .screen { position:relative; z-index:10; width:100%; height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; padding:2rem; }
+
+  /* Top bar — progress only */
+  .top-bar { position:fixed; top:0; left:0; width:100%; height:4px; background:var(--border); z-index:20; }
+  .top-fill { height:100%; width:0%; transition:width 1s linear; }
+
+  /* Small header */
+  .small-header { position:fixed; top:12px; width:100%; display:flex; justify-content:space-between; padding:0 2rem; z-index:20; }
+  .sh-item { font-size:0.7rem; letter-spacing:0.2em; color:var(--muted); }
+
+  /* PHASE — biggest element */
+  .phase-mega { font-family:'Bebas Neue',sans-serif; font-size:min(22vw, 180px); line-height:0.9; letter-spacing:0.05em; text-align:center; transition:color 0.4s ease; }
+
+  /* CHRONO — second biggest */
+  .chrono-mega { font-family:'Bebas Neue',sans-serif; font-size:min(18vw, 150px); line-height:1; letter-spacing:0.05em; text-align:center; transition:color 0.4s ease; }
+
+  /* Divider */
+  .divider { width:80%; height:2px; transition:background 0.4s ease; margin:1.5rem 0; }
+
+  /* CADENCE + RESISTANCE — big but secondary */
+  .metrics-row { display:flex; gap:min(8vw, 80px); align-items:flex-end; justify-content:center; }
+  .metric { display:flex; flex-direction:column; align-items:center; gap:0.3rem; }
+  .metric-val { font-family:'Bebas Neue',sans-serif; font-size:min(12vw, 100px); line-height:1; letter-spacing:0.05em; transition:color 0.4s ease; }
+  .metric-lbl { font-family:'DM Mono',monospace; font-size:0.8rem; letter-spacing:0.3em; color:var(--muted); text-transform:uppercase; }
+  .metric-sep { width:2px; height:min(10vw, 80px); background:var(--border); align-self:center; }
+
+  /* Next block */
+  .next-block { position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.25em; color:var(--muted); opacity:0.6; white-space:nowrap; }
+
+  /* Block dots */
+  .block-dots { position:fixed; bottom:3.5rem; left:50%; transform:translateX(-50%); display:flex; gap:5px; }
+  .bdot { width:8px; height:8px; border-radius:2px; background:var(--border); transition:all 0.4s ease; }
+  .bdot.done { opacity:0.4; }
+  .bdot.active { box-shadow:0 0 6px currentColor; }
+
+  .controls { position:fixed; bottom:5.5rem; right:2rem; display:flex; gap:0.8rem; }
+  .btn { background:none; border:1px solid var(--border); color:var(--text); font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.15em; padding:0.5rem 1rem; cursor:pointer; transition:all 0.2s ease; text-transform:uppercase; opacity:0.5; }
+  .btn:hover { opacity:1; }
+
+  .finish-screen { display:none; flex-direction:column; align-items:center; gap:2rem; text-align:center; }
+  .finish-title { font-family:'Bebas Neue',sans-serif; font-size:min(20vw,160px); letter-spacing:0.1em; line-height:1; }
+  .finish-sub { font-size:0.8rem; letter-spacing:0.3em; color:var(--muted); }
+
+  .flash { animation:flash 0.3s ease; }
+  @keyframes flash { 0%{opacity:1;} 50%{opacity:0.1;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1" id="glow1"></div>
+
+<div class="top-bar"><div class="top-fill" id="topFill"></div></div>
+
+<div class="small-header">
+  <div class="sh-item" id="shLeft">OBSDNFIT × CYCLING</div>
+  <div class="sh-item" id="shRight">45:00</div>
+</div>
+
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">INDOOR CYCLING</div>
+  <div class="cd-number" id="cdNumber" style="color:#3b82f6">3</div>
+  <div class="cd-sub">CLIP IN · GET READY</div>
+</div>
+
+<div class="motivator" id="motivator"></div>
+
+<div class="screen" id="mainScreen">
+  <div class="phase-mega" id="phaseMega">WARM UP</div>
+  <div class="divider" id="divider" style="background:#22c55e44"></div>
+  <div class="chrono-mega" id="chronoMega" style="color:#22c55e">5:00</div>
+
+  <div class="metrics-row" style="margin-top:2rem;">
+    <div class="metric">
+      <div class="metric-val" id="cadenceVal" style="color:#22c55e">85</div>
+      <div class="metric-lbl">RPM</div>
+    </div>
+    <div class="metric-sep"></div>
+    <div class="metric">
+      <div class="metric-val" id="resistanceVal" style="color:#22c55e">LOW</div>
+      <div class="metric-lbl">RESISTANCE</div>
+    </div>
+  </div>
+
+  <div class="block-dots" id="blockDots"></div>
+  <div class="next-block" id="nextBlock">NEXT → STEADY</div>
+
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn" id="startBtn" onclick="startWithCountdown()">START</button>
+    <button class="btn" onclick="skipBlock()">SKIP</button>
+  </div>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title" style="color:#3b82f6">DONE.</div>
+  <div class="finish-sub">45 MIN · RIDE COMPLETE</div>
+  <div class="finish-sub" style="color:#3b82f6;margin-top:0.5rem">WELL DONE.</div>
+  <button class="btn" style="opacity:1;margin-top:1rem;border-color:#3b82f6;color:#3b82f6;" onclick="resetTimer();document.getElementById('finishScreen').style.display='none';document.getElementById('mainScreen').style.display='flex';">RESTART</button>
+</div>
+
+<script>
+const WORKOUT = [
+  { label:'WARM UP',   dur:300, cad:85,  res:'LOW',  color:'#22c55e', next:'STEADY' },
+  { label:'STEADY',    dur:180, cad:90,  res:'MED',  color:'#3b82f6', next:'RECOVER' },
+  { label:'RECOVER',   dur:60,  cad:80,  res:'LOW',  color:'#38bdf8', next:'HARD' },
+  { label:'HARD',      dur:120, cad:95,  res:'HIGH', color:'#8b5cf6', next:'RECOVER' },
+  { label:'RECOVER',   dur:60,  cad:80,  res:'LOW',  color:'#38bdf8', next:'SPRINT' },
+  { label:'SPRINT',    dur:30,  cad:110, res:'HIGH', color:'#ef4444', next:'RECOVER' },
+  { label:'RECOVER',   dur:90,  cad:80,  res:'LOW',  color:'#38bdf8', next:'HARD' },
+  { label:'HARD',      dur:120, cad:95,  res:'HIGH', color:'#8b5cf6', next:'RECOVER' },
+  { label:'RECOVER',   dur:60,  cad:80,  res:'LOW',  color:'#38bdf8', next:'SPRINT' },
+  { label:'SPRINT',    dur:30,  cad:115, res:'HIGH', color:'#ef4444', next:'COOL DOWN' },
+  { label:'COOL DOWN', dur:300, cad:75,  res:'LOW',  color:'#22c55e', next:'FINISH' },
+];
+
+const totalSeconds = WORKOUT.reduce((s,b) => s+b.dur, 0);
+const circumference = 722.57;
+let currentBlock = 0, timeLeft = WORKOUT[0].dur, running = false, interval = null, elapsed = 0;
+
+function fmt(s) { return Math.floor(s/60)+':'+(s%60).toString().padStart(2,'0'); }
+
+function buildDots() {
+  const row = document.getElementById('blockDots');
+  row.innerHTML = '';
+  WORKOUT.forEach((b,i) => {
+    const d = document.createElement('div');
+    d.className = 'bdot'; d.id = `bd-${i}`;
+    d.style.background = b.color; d.style.color = b.color;
+    row.appendChild(d);
+  });
+}
+
+function updateUI() {
+  const b = WORKOUT[currentBlock];
+  document.getElementById('phaseMega').textContent = b.label;
+  document.getElementById('phaseMega').style.color = b.color;
+  document.getElementById('chronoMega').textContent = fmt(timeLeft);
+  document.getElementById('chronoMega').style.color = b.color;
+  document.getElementById('divider').style.background = b.color + '44';
+  document.getElementById('cadenceVal').textContent = b.cad;
+  document.getElementById('cadenceVal').style.color = b.color;
+  document.getElementById('resistanceVal').textContent = b.res;
+  document.getElementById('resistanceVal').style.color = b.color;
+  document.getElementById('nextBlock').textContent = b.next !== 'FINISH' ? `NEXT → ${b.next}` : 'LAST BLOCK';
+  document.getElementById('glow1').style.background = b.color + '18';
+  document.getElementById('topFill').style.width = (elapsed/totalSeconds*100)+'%';
+  document.getElementById('topFill').style.background = b.color;
+  document.getElementById('shRight').textContent = fmt(Math.max(0,totalSeconds-elapsed));
+
+  WORKOUT.forEach((_,i) => {
+    const d = document.getElementById(`bd-${i}`);
+    if (!d) return;
+    if (i < currentBlock) d.className = 'bdot done';
+    else if (i === currentBlock) d.className = 'bdot active';
+    else d.className = 'bdot';
+  });
+}
+
+function showMotivator(t,c) { const e=document.getElementById('motivator'); e.textContent=t; e.style.color=c; e.style.opacity='1'; setTimeout(()=>{e.style.opacity='0';},2000); }
+
+function tick() {
+  if (timeLeft > 0) {
+    timeLeft--; elapsed++;
+    if (timeLeft===10) showMotivator('10 SECONDS!', WORKOUT[currentBlock].color);
+    updateUI();
+  } else {
+    document.body.classList.add('flash');
+    setTimeout(()=>document.body.classList.remove('flash'),300);
+    currentBlock++;
+    if (currentBlock >= WORKOUT.length) { clearInterval(interval); running=false; showMotivator('RIDE DONE.','#3b82f6'); soundFinish();setTimeout(showFinish,1500); return; }
+    timeLeft = WORKOUT[currentBlock].dur;
+    showMotivator(WORKOUT[currentBlock].label+'!', WORKOUT[currentBlock].color);
+    updateUI();
+  }
+}
+
+function startWithCountdown() {
+  const btn=document.getElementById('startBtn');
+  if (running) { clearInterval(interval); running=false; btn.textContent='RESUME'; return; }
+  if (elapsed===0) {
+    const ov=document.getElementById('countdownOverlay'); const cdN=document.getElementById('cdNumber');
+    ov.style.display='flex'; let count=3; cdN.textContent=count;
+    const cdI=setInterval(()=>{ count--; if(count===0){clearInterval(cdI);ov.style.display='none';interval=setInterval(tick,1000);running=true;btn.textContent='PAUSE';showMotivator("LET'S RIDE!",'#3b82f6');}else{cdN.textContent=count;cdN.style.animation='none';cdN.offsetHeight;cdN.style.animation='cdpulse 1s ease-in-out';} },1000);
+  } else { interval=setInterval(tick,1000); running=true; btn.textContent='PAUSE'; }
+}
+
+function resetTimer() { clearInterval(interval); running=false; currentBlock=0; timeLeft=WORKOUT[0].dur; elapsed=0; document.getElementById('startBtn').textContent='START'; buildDots(); updateUI(); }
+function skipBlock() { currentBlock++; if(currentBlock>=WORKOUT.length){clearInterval(interval);running=false;showFinish();return;} timeLeft=WORKOUT[currentBlock].dur; updateUI(); }
+function showFinish() { document.getElementById('mainScreen').style.display='none'; document.getElementById('finishScreen').style.display='flex'; }
+
+buildDots(); updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>

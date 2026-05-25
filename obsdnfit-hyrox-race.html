@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hyrox Race Simulation — 72 Min</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090e;
+    --border: #1c1c28;
+    --run: #38bdf8;
+    --work: #eab308;
+    --text: #e2e8f0;
+    --muted: #475569;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh; display: flex;
+    flex-direction: column; align-items: center;
+    justify-content: center; overflow: hidden; position: relative;
+  }
+
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 100; opacity: 0.4;
+  }
+
+  .glow { position: fixed; border-radius: 50%; filter: blur(140px); pointer-events: none; transition: background 1.5s ease; }
+  .glow-1 { width: 700px; height: 700px; top: -250px; left: -250px; background: rgba(56,189,248,0.05); }
+  .glow-2 { width: 500px; height: 500px; bottom: -150px; right: -150px; background: rgba(234,179,8,0.04); }
+
+  /* Countdown */
+  .countdown-overlay {
+    position: fixed; inset: 0; z-index: 200; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;
+  }
+  .cd-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.4em; color: var(--muted); }
+  .cd-number { font-family: 'Bebas Neue', sans-serif; font-size: 12rem; line-height: 1; color: var(--run); animation: cdpulse 1s ease-in-out; }
+  .cd-sub { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 0.25em; color: var(--muted); }
+  @keyframes cdpulse { 0%{transform:scale(1.3);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+
+  /* Motivator */
+  .motivator {
+    position: fixed; top: 8%; left: 50%; transform: translateX(-50%);
+    font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 0.35em;
+    pointer-events: none; z-index: 150; opacity: 0; transition: opacity 0.3s ease; white-space: nowrap;
+  }
+
+  .container {
+    position: relative; z-index: 10; width: 100%; max-width: 600px;
+    padding: 1.5rem 1.5rem; display: flex; flex-direction: column;
+    align-items: center; gap: 1.2rem;
+  }
+
+  .header { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  .title { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.25em; color: var(--muted); }
+  .total-time { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.1em; }
+
+  .overall-progress { width: 100%; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .overall-fill { height: 100%; background: linear-gradient(90deg, var(--run), var(--work)); width: 0%; transition: width 1s linear; }
+
+  /* Big phase label */
+  .phase-label {
+    font-family: 'Bebas Neue', sans-serif; font-size: 4.5rem;
+    letter-spacing: 0.2em; line-height: 1; transition: color 0.6s ease; text-align: center;
+  }
+  .phase-label.run { color: var(--run); }
+  .phase-label.work { color: var(--work); }
+
+  /* Phase icon / indicator */
+  .phase-badge {
+    font-size: 0.65rem; letter-spacing: 0.25em;
+    padding: 4px 16px; border: 1px solid;
+    transition: all 0.6s ease;
+  }
+  .phase-badge.run { color: var(--run); border-color: rgba(56,189,248,0.3); }
+  .phase-badge.work { color: var(--work); border-color: rgba(234,179,8,0.3); }
+
+  .timer-wrap { position: relative; width: 250px; height: 250px; }
+  .timer-svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .timer-track { fill: none; stroke: var(--border); stroke-width: 3; }
+  .timer-progress { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s linear, stroke 0.6s ease; }
+  .timer-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.2rem; }
+  .timer-count { font-family: 'Bebas Neue', sans-serif; font-size: 4.5rem; line-height: 1; letter-spacing: 0.05em; transition: color 0.6s ease; }
+  .timer-unit { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  /* Station info */
+  .station-info {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .station-name {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem;
+    letter-spacing: 0.15em; text-align: center; transition: color 0.4s ease;
+  }
+  .station-reps {
+    font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted);
+    text-align: center; opacity: 0.8;
+  }
+  .station-tip {
+    font-size: 0.58rem; letter-spacing: 0.1em; color: var(--muted);
+    text-align: center; opacity: 0.5; max-width: 400px;
+  }
+
+  /* Race map — 8 stations horizontal */
+  .race-map {
+    width: 100%;
+    display: flex; align-items: center; gap: 0;
+  }
+
+  .race-segment {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1;
+  }
+
+  .seg-bar {
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--border); transition: all 0.4s ease;
+    position: relative;
+  }
+  .seg-bar.run-done { background: var(--run); opacity: 0.4; }
+  .seg-bar.run-active { background: var(--run); box-shadow: 0 0 8px var(--run); }
+  .seg-bar.work-done { background: var(--work); opacity: 0.4; }
+  .seg-bar.work-active { background: var(--work); box-shadow: 0 0 8px var(--work); }
+
+  .seg-icon { font-size: 0.5rem; letter-spacing: 0.05em; color: var(--muted); text-align: center; }
+
+  /* Arrow between segments */
+  .seg-arrow {
+    font-size: 0.5rem; color: rgba(255,255,255,0.1);
+    margin: 0 -1px; flex-shrink: 0;
+    padding-bottom: 14px;
+  }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 2rem; align-items: center; }
+  .stat-block { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+  .stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.1em; line-height: 1; }
+  .stat-label { font-size: 0.58rem; letter-spacing: 0.2em; color: var(--muted); text-transform: uppercase; }
+  .sep { width: 1px; height: 36px; background: var(--border); }
+
+  .controls { display: flex; gap: 1rem; align-items: center; }
+  .btn { background: none; border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.15em; padding: 0.6rem 1.4rem; cursor: pointer; transition: all 0.2s ease; text-transform: uppercase; }
+  .btn:hover { border-color: var(--work); color: var(--work); }
+  .btn-main { background: var(--run); border-color: var(--run); color: #000; font-size: 0.75rem; padding: 0.75rem 2.5rem; }
+  .btn-main:hover { background: #29a8d8; border-color: #29a8d8; }
+  .btn-main.working { background: var(--work); border-color: var(--work); }
+  .btn-main.working:hover { background: #ca9e07; border-color: #ca9e07; }
+
+  .lofi-tag { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted); display: flex; align-items: center; gap: 0.5rem; opacity: 0.5; }
+  .lofi-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--work); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4;transform:scale(1);} 50%{opacity:1;transform:scale(1.3);} }
+
+  .finish-screen { display: none; flex-direction: column; align-items: center; gap: 1.5rem; text-align: center; }
+  .finish-title { font-family: 'Bebas Neue', sans-serif; font-size: 5rem; letter-spacing: 0.15em; color: var(--work); line-height: 1; }
+  .finish-sub { font-size: 0.7rem; letter-spacing: 0.2em; color: var(--muted); }
+
+  .flash { animation: flash 0.4s ease; }
+  @keyframes flash { 0%{opacity:1;} 50%{opacity:0.15;} 100%{opacity:1;} }
+</style>
+</head>
+<body>
+
+<div class="glow glow-1" id="glow1"></div>
+<div class="glow glow-2" id="glow2"></div>
+
+<div class="countdown-overlay" id="countdownOverlay" style="display:none;">
+  <div class="cd-label">HYROX RACE SIM</div>
+  <div class="cd-number" id="cdNumber">3</div>
+  <div class="cd-sub">RUN 1KM · THEN WORK</div>
+</div>
+
+<div class="motivator" id="motivator"></div>
+
+<div class="container" id="mainScreen">
+  <div class="header">
+    <div class="title">OBSDNFIT × HYROX RACE</div>
+    <div class="total-time" id="totalDisplay">72:00</div>
+  </div>
+
+  <div class="overall-progress">
+    <div class="overall-fill" id="overallFill"></div>
+  </div>
+
+  <div class="phase-label run" id="phaseLabel">RUN</div>
+  <div class="phase-badge run" id="phaseBadge">1 KM — KEEP YOUR PACE</div>
+
+  <div class="timer-wrap">
+    <svg class="timer-svg" viewBox="0 0 250 250">
+      <circle class="timer-track" cx="125" cy="125" r="115"/>
+      <circle class="timer-progress" id="timerCircle" cx="125" cy="125" r="115"
+        stroke="#38bdf8" stroke-dasharray="722.57" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-inner">
+      <div class="timer-count" id="timerCount" style="color:var(--run)">6:00</div>
+      <div class="timer-unit" id="timerUnit">MIN LEFT</div>
+    </div>
+  </div>
+
+  <div class="station-info">
+    <div class="station-name" id="stationName" style="color:var(--run)">RUN TO STATION 1</div>
+    <div class="station-reps" id="stationReps">MAINTAIN RACE PACE · BREATHE THROUGH NOSE</div>
+    <div class="station-tip" id="stationTip">NEXT → SKI ERG</div>
+  </div>
+
+  <!-- Race map -->
+  <div class="race-map" id="raceMap"></div>
+
+  <div class="stats-row">
+    <div class="stat-block">
+      <div class="stat-val" id="stationDisplay">1</div>
+      <div class="stat-label">Station</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat-block">
+      <div class="stat-val">8</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="sep"></div>
+    <div class="stat-block">
+      <div class="stat-val" id="elapsedDisplay">0:00</div>
+      <div class="stat-label">Elapsed</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" onclick="resetTimer()">RESET</button>
+    <button class="btn btn-main" id="startBtn" onclick="startWithCountdown()">START</button>
+    <button class="btn" onclick="skipPhase()">SKIP</button>
+  </div>
+
+  <div class="lofi-tag">
+    <div class="lofi-dot"></div>
+    LO-FI MODE — ADD YOUR MUSIC
+  </div>
+</div>
+
+<div class="finish-screen" id="finishScreen">
+  <div class="finish-title">RACE DONE.</div>
+  <div class="finish-sub">8 STATIONS · 8 KM RUN · 72 MINUTES</div>
+  <div class="finish-sub" style="margin-top:0.5rem;color:var(--work)">WELL DONE.</div>
+  <button class="btn btn-main" onclick="resetTimer();document.getElementById('finishScreen').style.display='none';document.getElementById('mainScreen').style.display='flex';" style="margin-top:1rem">RESTART</button>
+</div>
+
+<script>
+const STATIONS = [
+  { name: "SKI ERG",           reps: "1000M — MAX EFFORT",          tip: "Pull with lats, not arms" },
+  { name: "SLED PUSH",         reps: "50M — DRIVE THROUGH HEELS",   tip: "Low hips, full extension" },
+  { name: "SLED PULL",         reps: "50M — LEAN BACK HARD",        tip: "Short quick steps backward" },
+  { name: "BURPEE BROAD JUMP", reps: "80 REPS — EXPLODE FORWARD",   tip: "Use arms to launch forward" },
+  { name: "ROWING",            reps: "1000M — LEGS CORE ARMS",      tip: "Drive legs first, finish with arms" },
+  { name: "FARMERS CARRY",     reps: "200M — CHEST UP CORE TIGHT",  tip: "Don't let shoulders round" },
+  { name: "SANDBAG LUNGES",    reps: "100M — CONTROLLED DESCENT",   tip: "Full lockout at the top" },
+  { name: "WALL BALLS",        reps: "100 REPS — HIT THE TARGET",   tip: "Full squat, explosive drive" },
+];
+
+const RUN_TIME = 360;  // 6 min
+const WORK_TIME = 180; // 3 min
+const TOTAL_STATIONS = 8;
+// Each station = RUN + WORK = 540s. Total = 4320s = 72min
+
+let currentStation = 0;
+let isRun = true;
+let timeLeft = RUN_TIME;
+let running = false;
+let interval = null;
+let elapsedSeconds = 0;
+const totalSeconds = (RUN_TIME + WORK_TIME) * TOTAL_STATIONS;
+const circumference = 722.57;
+
+function fmt(s) {
+  const m = Math.floor(s/60); const sec = (s%60).toString().padStart(2,'0');
+  return `${m}:${sec}`;
+}
+
+function buildRaceMap() {
+  const map = document.getElementById('raceMap');
+  map.innerHTML = '';
+  for (let i = 0; i < TOTAL_STATIONS; i++) {
+    // Run segment
+    const runSeg = document.createElement('div');
+    runSeg.className = 'race-segment';
+    runSeg.innerHTML = `<div class="seg-bar" id="run-${i}"></div><div class="seg-icon">🏃</div>`;
+    map.appendChild(runSeg);
+
+    // Arrow
+    const arrow = document.createElement('div');
+    arrow.className = 'seg-arrow';
+    arrow.textContent = '›';
+    map.appendChild(arrow);
+
+    // Work segment
+    const workSeg = document.createElement('div');
+    workSeg.className = 'race-segment';
+    workSeg.innerHTML = `<div class="seg-bar" id="work-${i}"></div><div class="seg-icon">${i+1}</div>`;
+    map.appendChild(workSeg);
+
+    if (i < TOTAL_STATIONS - 1) {
+      const arrow2 = document.createElement('div');
+      arrow2.className = 'seg-arrow';
+      arrow2.textContent = '›';
+      map.appendChild(arrow2);
+    }
+  }
+}
+
+function updateRaceMap() {
+  for (let i = 0; i < TOTAL_STATIONS; i++) {
+    const rb = document.getElementById(`run-${i}`);
+    const wb = document.getElementById(`work-${i}`);
+    if (!rb || !wb) continue;
+
+    if (i < currentStation) {
+      rb.className = 'seg-bar run-done';
+      wb.className = 'seg-bar work-done';
+    } else if (i === currentStation) {
+      rb.className = isRun ? 'seg-bar run-active' : 'seg-bar run-done';
+      wb.className = isRun ? 'seg-bar' : 'seg-bar work-active';
+    } else {
+      rb.className = 'seg-bar';
+      wb.className = 'seg-bar';
+    }
+  }
+}
+
+function updateUI() {
+  const st = STATIONS[currentStation];
+  const duration = isRun ? RUN_TIME : WORK_TIME;
+  const progress = timeLeft / duration;
+  const offset = circumference * (1 - progress);
+
+  document.getElementById('timerCircle').style.strokeDashoffset = offset;
+  document.getElementById('timerCount').textContent = fmt(timeLeft);
+
+  if (isRun) {
+    document.getElementById('phaseLabel').textContent = 'RUN';
+    document.getElementById('phaseLabel').className = 'phase-label run';
+    document.getElementById('phaseBadge').textContent = '1 KM — KEEP YOUR PACE';
+    document.getElementById('phaseBadge').className = 'phase-badge run';
+    document.getElementById('timerCount').style.color = 'var(--run)';
+    document.getElementById('timerCircle').style.stroke = '#38bdf8';
+    document.getElementById('stationName').textContent = `RUN TO STATION ${currentStation + 1}`;
+    document.getElementById('stationName').style.color = 'var(--run)';
+    document.getElementById('stationReps').textContent = 'MAINTAIN RACE PACE · BREATHE THROUGH NOSE';
+    document.getElementById('stationTip').textContent = `NEXT → ${st.name}`;
+    document.getElementById('startBtn').className = 'btn btn-main';
+    document.getElementById('glow1').style.background = 'rgba(56,189,248,0.07)';
+    document.getElementById('glow2').style.background = 'rgba(234,179,8,0.03)';
+  } else {
+    const nextSt = STATIONS[currentStation + 1];
+    document.getElementById('phaseLabel').textContent = 'WORK';
+    document.getElementById('phaseLabel').className = 'phase-label work';
+    document.getElementById('phaseBadge').textContent = `STATION ${currentStation + 1} — ${st.name}`;
+    document.getElementById('phaseBadge').className = 'phase-badge work';
+    document.getElementById('timerCount').style.color = 'var(--work)';
+    document.getElementById('timerCircle').style.stroke = '#eab308';
+    document.getElementById('stationName').textContent = st.name;
+    document.getElementById('stationName').style.color = 'var(--work)';
+    document.getElementById('stationReps').textContent = st.reps;
+    document.getElementById('stationTip').textContent = st.tip + (nextSt ? ` · NEXT → RUN TO ${nextSt.name}` : ' · LAST STATION!');
+    document.getElementById('startBtn').className = 'btn btn-main working';
+    document.getElementById('glow1').style.background = 'rgba(234,179,8,0.07)';
+    document.getElementById('glow2').style.background = 'rgba(56,189,248,0.03)';
+  }
+
+  document.getElementById('stationDisplay').textContent = currentStation + 1;
+  document.getElementById('elapsedDisplay').textContent = fmt(elapsedSeconds);
+
+  const pct = (elapsedSeconds / totalSeconds) * 100;
+  document.getElementById('overallFill').style.width = pct + '%';
+  document.getElementById('totalDisplay').textContent = fmt(Math.max(0, totalSeconds - elapsedSeconds));
+
+  updateRaceMap();
+}
+
+function showMotivator(text, color) {
+  const el = document.getElementById('motivator');
+  el.textContent = text; el.style.color = color; el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+function tick() {
+  if (timeLeft > 0) {
+    timeLeft--; elapsedSeconds++;
+    updateUI();
+  } else {
+    document.body.classList.add('flash');
+    setTimeout(() => document.body.classList.remove('flash'), 400);
+    if (isRun) {
+      isRun = false; timeLeft = WORK_TIME;
+      showMotivator(STATIONS[currentStation].name.toUpperCase() + '!', '#eab308');
+    } else {
+      currentStation++;
+      if (currentStation >= TOTAL_STATIONS) {
+        clearInterval(interval); running = false;
+        showMotivator('WELL DONE.', '#eab308');
+        soundFinish();setTimeout(showFinish, 1500); return;
+      }
+      isRun = true; timeLeft = RUN_TIME; soundWork();
+      showMotivator('RUN!', '#38bdf8');
+    }
+    updateUI();
+  }
+}
+
+function startWithCountdown() {
+  const btn = document.getElementById('startBtn');
+  if (running) { clearInterval(interval); running = false; btn.textContent = 'RESUME'; return; }
+  if (elapsedSeconds === 0) {
+    const ov = document.getElementById('countdownOverlay');
+    const cdN = document.getElementById('cdNumber');
+    ov.style.display = 'flex'; let count = 3; cdN.textContent = count;
+    const cdI = setInterval(() => {
+      count--;
+      if (count === 0) {
+        clearInterval(cdI); ov.style.display = 'none';
+        interval = setInterval(tick, 1000); running = true; btn.textContent = 'PAUSE';
+        showMotivator('RUN!', '#38bdf8');
+      } else {
+        cdN.textContent = count; cdN.style.animation = 'none';
+        cdN.offsetHeight; cdN.style.animation = 'cdpulse 1s ease-in-out';
+      }
+    }, 1000);
+  } else { interval = setInterval(tick, 1000); running = true; btn.textContent = 'PAUSE'; }
+}
+
+function resetTimer() {
+  clearInterval(interval); running = false;
+  currentStation = 0; isRun = true;
+  timeLeft = RUN_TIME; elapsedSeconds = 0;
+  document.getElementById('startBtn').textContent = 'START';
+  document.getElementById('startBtn').className = 'btn btn-main';
+  buildRaceMap(); updateUI();
+}
+
+function skipPhase() {
+  if (isRun) { isRun = false; timeLeft = WORK_TIME; }
+  else {
+    currentStation++;
+    if (currentStation >= TOTAL_STATIONS) { clearInterval(interval); running = false; showFinish(); return; }
+    isRun = true; timeLeft = RUN_TIME; soundWork();
+  }
+  updateUI();
+}
+
+function showFinish() {
+  document.getElementById('mainScreen').style.display = 'none';
+  document.getElementById('finishScreen').style.display = 'flex';
+}
+
+buildRaceMap();
+updateUI();
+
+// OBSDNFIT Sound System
+let _audioCtx = null;
+function _getCtx() { if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); return _audioCtx; }
+function _osc(freq, start, dur, type='sine', vol=0.4, ramp=false) { const c = _getCtx(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.type = type; o.frequency.setValueAtTime(freq, c.currentTime + start); if (ramp) o.frequency.linearRampToValueAtTime(ramp, c.currentTime + start + dur); g.gain.setValueAtTime(0, c.currentTime + start); g.gain.linearRampToValueAtTime(vol, c.currentTime + start + 0.005); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); o.start(c.currentTime + start); o.stop(c.currentTime + start + dur + 0.05); }
+function _noise(start, dur, vol=0.1) { const c = _getCtx(); const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate); const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1; const src = c.createBufferSource(); const g = c.createGain(); const filter = c.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; src.buffer = buf; src.connect(filter); filter.connect(g); g.connect(c.destination); g.gain.setValueAtTime(vol, c.currentTime + start); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + start + dur); src.start(c.currentTime + start); }
+function soundWork() { _noise(0,0.08,0.3); _osc(200,0,0.15,'square',0.3); _osc(800,0,0.1,'sine',0.4); }
+function soundRest() { _osc(523,0,0.8,'sine',0.3); _osc(659,0.05,0.7,'sine',0.2); _osc(784,0.1,0.6,'sine',0.15); }
+function soundWarning() { for(let i=0;i<3;i++){_osc(1000,i*0.3,0.05,'square',0.2); _noise(i*0.3,0.04,0.15);} }
+function soundFinish() { _osc(523,0,0.2,'sine',0.4); _osc(659,0.2,0.2,'sine',0.4); _osc(784,0.4,0.2,'sine',0.4); _osc(1047,0.6,0.6,'sine',0.5); }
+function soundBell() { _osc(400,0,0.05,'square',0.5); _osc(350,0,1.8,'sine',0.45); _osc(700,0.01,1.2,'sine',0.2); _osc(175,0.02,2.0,'sine',0.3); _noise(0,0.08,0.3); }
+</script>
+</body>
+</html>
